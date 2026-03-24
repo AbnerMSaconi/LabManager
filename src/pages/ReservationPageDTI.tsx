@@ -23,7 +23,7 @@ import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
 import { StatusBadge, WEEKDAY_NAMES, TimetableWizard } from "./reservationShared";
 import { ApiError } from "../api/client";
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 8;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -401,7 +401,7 @@ export function ReservationPageDTI() {
   const { showToast, ToastComponent } = useToast();
   const { data, loading, error, refetch } = useFetch(reservationsApi.listAll);
 
-  const [filter, setFilter]             = useState<string>("all");
+  const [filter, setFilter]             = useState<string>(ReservationStatus.PENDENTE);
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [modal, setModal]               = useState<ModalState>({ type: "none" });
@@ -559,11 +559,11 @@ export function ReservationPageDTI() {
       {/* ── Filtros de status ── */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {[
-          { value: "all",                                    label: "Ativas" },
           { value: ReservationStatus.PENDENTE,               label: "Pendentes" },
-          { value: ReservationStatus.APROVADO,               label: "Aprovadas" },
           { value: ReservationStatus.AGUARDANDO_SOFTWARE,    label: "Aguard. Software" },
           { value: ReservationStatus.APROVADO_COM_RESSALVAS, label: "Com Ressalvas" },
+          { value: "all",                                    label: "Todas Ativas" },
+          { value: ReservationStatus.APROVADO,               label: "Aprovadas" },
         ].map(s => (
           <button key={s.value} onClick={() => { setFilter(s.value); setVisibleCount(ITEMS_PER_PAGE); }}
             className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${
