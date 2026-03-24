@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { 
-  Monitor, CheckCircle2, XCircle, Calendar, AlertTriangle, Layers, 
-  ChevronDown, ChevronUp, CalendarDays, Search, Trash2, Edit, Package, Building2, ChevronLeft, Info 
+import {
+  Monitor, CheckCircle2, XCircle, Calendar, AlertTriangle, Layers,
+  ChevronDown, ChevronUp, CalendarDays, Search, Trash2, Edit, Package, Building2, ChevronLeft, Info, Plus, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole, ReservationStatus, Reservation, LaboratoryBlock, Laboratory } from "../types";
@@ -314,15 +314,15 @@ function TimetableWizard({ onClose }: { onClose: () => void }) {
 }
 
 // ============================================================================
-// 3. VISUALIZAÇÃO DO ADMINISTRADOR (TABELA)
+// 3. VISUALIZAÇÃO DO ADMINISTRADOR (TABELA) — base compartilhada
 // ============================================================================
-function AdminReservations() {
+function AdminReservations({ canApprove, onNewReservation }: { canApprove: boolean; onNewReservation?: () => void }) {
   const { showToast, ToastComponent } = useToast();
   const { data, loading, error, refetch } = useFetch(reservationsApi.listAll);
 
   const [filter, setFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "timetable">("list");
-  
+
   const ITEMS_PER_PAGE = 15;
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
 
@@ -394,7 +394,7 @@ function AdminReservations() {
         </td>
         <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
         <td className="px-6 py-4 text-right">
-          {r.status === ReservationStatus.PENDENTE && (
+          {canApprove && r.status === ReservationStatus.PENDENTE && (
             <div className="flex justify-end gap-2">
               <button onClick={() => handleReviewSingle(r.id, { status: ReservationStatus.APROVADO })} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100"><CheckCircle2 size={16}/></button>
               <button onClick={() => handleReviewSingle(r.id, { status: ReservationStatus.REJEITADO, rejection_reason: "Indisponibilidade" })} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><XCircle size={16}/></button>
@@ -454,7 +454,7 @@ function AdminReservations() {
         </td>
         <td className="px-6 py-4"><StatusBadge status={first.status} /></td>
         <td className="px-6 py-4 text-right">
-          {first.status === ReservationStatus.PENDENTE && (
+          {canApprove && first.status === ReservationStatus.PENDENTE && (
             <div className="flex justify-end gap-2">
               <button onClick={() => handleReviewGroup(first.group_id as string, { status: ReservationStatus.APROVADO })} className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors border border-emerald-200"><CheckCircle2 size={14}/> Aprovar Lote</button>
               <button onClick={() => handleReviewGroup(first.group_id as string, { status: ReservationStatus.REJEITADO, rejection_reason: "Indisponibilidade no Semestre" })} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors border border-red-200"><XCircle size={14}/> Rejeitar Lote</button>
@@ -475,9 +475,16 @@ function AdminReservations() {
           <h2 className="text-2xl font-bold text-neutral-900">Gerenciar Solicitações</h2>
           <p className="text-sm text-neutral-500 mt-1">Controle de aprovações e agendamentos da universidade.</p>
         </div>
-        <button onClick={() => setViewMode("timetable")} className="bg-white border border-neutral-200 text-neutral-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-50 transition-colors shadow-sm">
-          <Search size={18} /> Verificar Grade
-        </button>
+        <div className="flex gap-2">
+          {onNewReservation && (
+            <button onClick={onNewReservation} className="bg-neutral-900 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-800 transition-colors shadow-sm">
+              <Plus size={18} /> Nova Reserva
+            </button>
+          )}
+          <button onClick={() => setViewMode("timetable")} className="bg-white border border-neutral-200 text-neutral-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-50 transition-colors shadow-sm">
+            <Search size={18} /> Verificar Grade
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
@@ -537,9 +544,21 @@ export function ReservationsPage({ onNewReservation }: { onNewReservation: () =>
   const { user } = useAuth();
   if (!user) return null;
 
+  // Professor: vê somente as próprias reservas
   if (user.role === UserRole.PROFESSOR) {
     return <ProfessorReservations onNewReservation={onNewReservation} />;
   }
 
-  return <AdminReservations />;
+  // Progex: visão admin completa + pode criar novas reservas
+  if (user.role === UserRole.PROGEX) {
+    return <AdminReservations canApprove={true} onNewReservation={onNewReservation} />;
+  }
+
+  // DTI Técnico: visão admin completa com aprovação/rejeição
+  if (user.role === UserRole.DTI_TECNICO) {
+    return <AdminReservations canApprove={true} />;
+  }
+
+  // DTI Estagiário: visão admin somente leitura (sem botões de ação)
+  return <AdminReservations canApprove={false} />;
 }
