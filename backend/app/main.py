@@ -530,6 +530,64 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 from .models.base_models import Laboratory, Software as SoftwareModel, LessonSlot
 
+class LabAvailabilityRequest(BaseModel):
+    dates: List[str]
+    slot_ids: List[int]
+    block: Optional[str] = None
+
+
+@app.post("/api/v1/labs/available", tags=["laboratórios"])
+async def get_available_labs(
+    req: LabAvailabilityRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retorna os laboratórios sem nenhuma reserva ativa para as datas e horários informados.
+    Usado pelo wizard do professor para sugerir laboratórios disponíveis.
+    """
+    from datetime import datetime as _dt
+    if not req.dates or not req.slot_ids:
+        raise HTTPException(status_code=400, detail="Datas e horários são obrigatórios.")
+
+    parsed_dates = []
+    for d in req.dates:
+        try:
+            parsed_dates.append(_dt.strptime(d, "%Y-%m-%d").date())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Data inválida: {d}")
+
+    active_statuses = [
+        ReservationStatus.PENDENTE.value,
+        ReservationStatus.APROVADO.value,
+        ReservationStatus.AGUARDANDO_SOFTWARE.value,
+        ReservationStatus.EM_USO.value,
+    ]
+
+    # Lab IDs que têm pelo menos uma reserva conflitante em qualquer das datas/slots
+    conflicting_rows = (
+        db.query(Reservation.lab_id)
+        .join(ReservationSlot, ReservationSlot.reservation_id == Reservation.id)
+        .filter(
+            Reservation.date.in_(parsed_dates),
+            Reservation.status.in_(active_statuses),
+            ReservationSlot.slot_id.in_(req.slot_ids),
+        )
+        .distinct()
+        .all()
+    )
+    conflicting_ids = {row.lab_id for row in conflicting_rows}
+
+    from .models.base_models import Laboratory
+    query = db.query(Laboratory).options(joinedload(Laboratory.softwares))
+    if req.block:
+        query = query.filter(Laboratory.block == req.block)
+    if conflicting_ids:
+        query = query.filter(Laboratory.id.notin_(conflicting_ids))
+
+    return query.order_by(Laboratory.name).all()
+
+
 @app.get("/api/v1/labs", tags=["laboratórios"])
 async def list_labs(
     db: Session = Depends(get_db),

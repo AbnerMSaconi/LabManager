@@ -55,6 +55,7 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
   
   const [activeReservations, setActiveReservations] = useState<Reservation[]>([]);
+  const [availableLabIds, setAvailableLabIds] = useState<number[]>([]);
   const [fetchingAvailability, setFetchingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -116,10 +117,17 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
   const checkAvailabilityAndProceed = async () => {
     setFetchingAvailability(true);
     try {
-      // Dispara a checagem para todas as datas do lote em paralelo
-      const responses = await Promise.all(dates.map(d => reservationsApi.listByDate(d)));
-      const allActive = responses.flat(); // Achata o array de arrays
-      setActiveReservations(allActive);
+      // Busca reservas ativas por data (para marcar labs ocupados individualmente)
+      const [dateResponses, availableResponse] = await Promise.all([
+        Promise.all(dates.map(d => reservationsApi.listByDate(d))),
+        labsApi.checkAvailability({
+          dates,
+          slot_ids: selectedSlotIds,
+          block: selectedBlock ?? undefined,
+        }),
+      ]);
+      setActiveReservations(dateResponses.flat());
+      setAvailableLabIds(availableResponse.map(l => l.id));
       setStep(3);
     } catch (e) {
       showToast("Erro ao verificar disponibilidade. Tente novamente.", "error");
@@ -322,52 +330,95 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
         {/* STEP 3 — Laboratório */}
         {step === 3 && (
           <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-            <h2 className="text-xl font-bold">3. Laboratórios Disponíveis</h2>
-            <p className="text-sm text-neutral-500 -mt-4">
-              {dates.length > 1 ? "O laboratório precisa estar livre em TODAS as datas do lote selecionado." : "Avaliando disponibilidade para a data escolhida."}
-            </p>
+            <div>
+              <h2 className="text-xl font-bold">3. Laboratórios Disponíveis</h2>
+              <p className="text-sm text-neutral-500 mt-1">
+                {dates.length > 1
+                  ? "O laboratório precisa estar livre em TODAS as datas do lote."
+                  : "Avaliando disponibilidade para a data escolhida."}
+              </p>
+            </div>
+
             {labsLoading ? <LoadingSpinner /> : (
               labsForBlock.length === 0 ? (
                 <div className="bg-white p-12 rounded-2xl border border-neutral-200 text-center text-neutral-400">
                   Nenhum laboratório cadastrado neste bloco.
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4">
-                  {labsForBlock.map(lab => {
-                    // Impede o agendamento se o laboratório conflitar com QUALQUER data do lote
-                    const overlappingReservation = activeReservations.find(r => 
-                      r.lab_id === lab.id && 
-                      r.slots?.some(s => selectedSlotIds.includes(s.id))
-                    );
-                    const isOccupied = !!overlappingReservation;
+              ) : (() => {
+                // Ordena: disponíveis primeiro, depois ocupados
+                const sorted = [...labsForBlock].sort((a, b) => {
+                  const aFree = availableLabIds.includes(a.id);
+                  const bFree = availableLabIds.includes(b.id);
+                  if (aFree === bFree) return a.name.localeCompare(b.name);
+                  return aFree ? -1 : 1;
+                });
+                const freeCount = sorted.filter(l => availableLabIds.includes(l.id)).length;
 
-                    return (
-                      <button key={lab.id} 
-                        onClick={() => { if (!isOccupied) { setSelectedLab(lab); setStep(4); } }}
-                        disabled={isOccupied}
-                        className={`p-6 rounded-2xl border transition-all flex items-center justify-between text-left group ${
-                          isOccupied ? "bg-neutral-50 border-red-200 opacity-70 cursor-not-allowed" : "bg-white border-neutral-200 hover:border-neutral-900"
-                        }`}>
-                        <div className="flex items-center gap-4">
-                          <div className={`p-4 rounded-xl transition-colors ${isOccupied ? "bg-red-100 text-red-500" : "bg-neutral-50 group-hover:bg-neutral-900 group-hover:text-white"}`}>
-                            <Monitor size={24} />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-lg">{lab.name}</h4>
-                            <p className="text-sm text-neutral-500">Capacidade: {lab.capacity} • Sala {lab.room_number}</p>
-                            {isOccupied && (
-                              <p className="text-xs font-bold text-red-500 mt-1 flex items-center gap-1">
-                                <AlertTriangle size={12} /> Conflito de horário em uma ou mais datas do lote.
+                return (
+                  <div className="space-y-3">
+                    {freeCount > 0 && (
+                      <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 px-1">
+                        <CheckCircle2 size={13} />
+                        {freeCount} laboratório{freeCount > 1 ? "s disponíveis" : " disponível"} para os horários selecionados
+                      </p>
+                    )}
+                    {freeCount === 0 && (
+                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                        <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+                        <p className="text-sm text-amber-800 font-medium">
+                          Nenhum laboratório do bloco está livre para todos os horários e datas selecionados.
+                          Tente outro bloco ou ajuste os horários.
+                        </p>
+                      </div>
+                    )}
+
+                    {sorted.map(lab => {
+                      const isFree     = availableLabIds.includes(lab.id);
+                      const isOccupied = !isFree;
+
+                      return (
+                        <button key={lab.id}
+                          onClick={() => { if (isFree) { setSelectedLab(lab); setStep(4); } }}
+                          disabled={isOccupied}
+                          className={`w-full p-5 rounded-2xl border transition-all flex items-center justify-between text-left group ${
+                            isFree
+                              ? "bg-white border-neutral-200 hover:border-neutral-900 hover:shadow-sm"
+                              : "bg-neutral-50 border-neutral-200 opacity-60 cursor-not-allowed"
+                          }`}>
+                          <div className="flex items-center gap-4">
+                            <div className={`p-3.5 rounded-xl transition-colors ${
+                              isFree
+                                ? "bg-emerald-50 text-emerald-600 group-hover:bg-neutral-900 group-hover:text-white"
+                                : "bg-neutral-100 text-neutral-400"
+                            }`}>
+                              <Monitor size={22} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-base">{lab.name}</h4>
+                                {isFree && (
+                                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                                    Disponível
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-neutral-500 mt-0.5">
+                                Capacidade: {lab.capacity} • Sala {lab.room_number}
                               </p>
-                            )}
+                              {isOccupied && (
+                                <p className="text-xs font-bold text-neutral-400 mt-1 flex items-center gap-1">
+                                  <AlertTriangle size={11} /> Ocupado nos horários selecionados
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        {!isOccupied && <ChevronRight size={24} className="text-neutral-300 group-hover:text-neutral-900" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )
+                          {isFree && <ChevronRight size={20} className="text-neutral-300 group-hover:text-neutral-900 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()
             )}
             <button onClick={() => setStep(2)} className="px-6 py-2 font-bold text-neutral-500 hover:text-neutral-900">Voltar</button>
           </motion.div>
