@@ -123,7 +123,7 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
         labsApi.checkAvailability({
           dates,
           slot_ids: selectedSlotIds,
-          block: selectedBlock ?? undefined,
+          // sem filtro de bloco: retorna disponíveis de todos os blocos
         }),
       ]);
       setActiveReservations(dateResponses.flat());
@@ -335,91 +335,102 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
               <p className="text-sm text-neutral-500 mt-1">
                 {dates.length > 1
                   ? "O laboratório precisa estar livre em TODAS as datas do lote."
-                  : "Avaliando disponibilidade para a data escolhida."}
+                  : "Disponibilidade para a data escolhida."}
               </p>
             </div>
 
-            {labsLoading ? <LoadingSpinner /> : (
-              labsForBlock.length === 0 ? (
-                <div className="bg-white p-12 rounded-2xl border border-neutral-200 text-center text-neutral-400">
-                  Nenhum laboratório cadastrado neste bloco.
-                </div>
-              ) : (() => {
-                // Ordena: disponíveis primeiro, depois ocupados
-                const sorted = [...labsForBlock].sort((a, b) => {
-                  const aFree = availableLabIds.includes(a.id);
-                  const bFree = availableLabIds.includes(b.id);
-                  if (aFree === bFree) return a.name.localeCompare(b.name);
-                  return aFree ? -1 : 1;
-                });
-                const freeCount = sorted.filter(l => availableLabIds.includes(l.id)).length;
+            {labsLoading ? <LoadingSpinner /> : (() => {
+              const allLabs = labs ?? [];
+              const freeLabs     = allLabs.filter(l => availableLabIds.includes(l.id));
+              const occupiedInBlock = labsForBlock.filter(l => !availableLabIds.includes(l.id));
 
-                return (
-                  <div className="space-y-3">
-                    {freeCount > 0 && (
+              // Agrupa disponíveis por bloco
+              const byBlock = freeLabs.reduce<Record<string, Laboratory[]>>((acc, l) => {
+                (acc[l.block] ??= []).push(l);
+                return acc;
+              }, {});
+
+              // Coloca o bloco selecionado primeiro
+              const blockOrder = [
+                selectedBlock,
+                ...Object.keys(byBlock).filter(b => b !== selectedBlock),
+              ].filter((b): b is string => !!b && !!byBlock[b]);
+
+              return (
+                <div className="space-y-6">
+                  {/* Disponíveis — todos os blocos */}
+                  {freeLabs.length === 0 ? (
+                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                      <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+                      <p className="text-sm text-amber-800 font-medium">
+                        Nenhum laboratório está livre para os horários e datas selecionados. Ajuste os horários ou as datas.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
                       <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 px-1">
                         <CheckCircle2 size={13} />
-                        {freeCount} laboratório{freeCount > 1 ? "s disponíveis" : " disponível"} para os horários selecionados
+                        {freeLabs.length} laboratório{freeLabs.length > 1 ? "s disponíveis" : " disponível"} nos horários selecionados
                       </p>
-                    )}
-                    {freeCount === 0 && (
-                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                        <AlertTriangle size={16} className="text-amber-500 shrink-0" />
-                        <p className="text-sm text-amber-800 font-medium">
-                          Nenhum laboratório do bloco está livre para todos os horários e datas selecionados.
-                          Tente outro bloco ou ajuste os horários.
-                        </p>
-                      </div>
-                    )}
-
-                    {sorted.map(lab => {
-                      const isFree     = availableLabIds.includes(lab.id);
-                      const isOccupied = !isFree;
-
-                      return (
-                        <button key={lab.id}
-                          onClick={() => { if (isFree) { setSelectedLab(lab); setStep(4); } }}
-                          disabled={isOccupied}
-                          className={`w-full p-5 rounded-2xl border transition-all flex items-center justify-between text-left group ${
-                            isFree
-                              ? "bg-white border-neutral-200 hover:border-neutral-900 hover:shadow-sm"
-                              : "bg-neutral-50 border-neutral-200 opacity-60 cursor-not-allowed"
-                          }`}>
-                          <div className="flex items-center gap-4">
-                            <div className={`p-3.5 rounded-xl transition-colors ${
-                              isFree
-                                ? "bg-emerald-50 text-emerald-600 group-hover:bg-neutral-900 group-hover:text-white"
-                                : "bg-neutral-100 text-neutral-400"
-                            }`}>
-                              <Monitor size={22} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-base">{lab.name}</h4>
-                                {isFree && (
-                                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-                                    Disponível
-                                  </span>
-                                )}
+                      {blockOrder.map(block => (
+                        <div key={block} className="space-y-2">
+                          <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest px-1">
+                            {block} {block === selectedBlock ? "(bloco selecionado)" : ""}
+                          </p>
+                          {byBlock[block].map(lab => (
+                            <button key={lab.id}
+                              onClick={() => { setSelectedLab(lab); setStep(4); }}
+                              className="w-full p-5 rounded-2xl border bg-white border-neutral-200 hover:border-neutral-900 hover:shadow-sm transition-all flex items-center justify-between text-left group">
+                              <div className="flex items-center gap-4">
+                                <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-neutral-900 group-hover:text-white transition-colors">
+                                  <Monitor size={22} />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-bold text-base">{lab.name}</h4>
+                                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                                      Disponível
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-neutral-500 mt-0.5">
+                                    Capacidade: {lab.capacity} • Sala {lab.room_number}
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-sm text-neutral-500 mt-0.5">
-                                Capacidade: {lab.capacity} • Sala {lab.room_number}
-                              </p>
-                              {isOccupied && (
-                                <p className="text-xs font-bold text-neutral-400 mt-1 flex items-center gap-1">
-                                  <AlertTriangle size={11} /> Ocupado nos horários selecionados
-                                </p>
-                              )}
-                            </div>
+                              <ChevronRight size={20} className="text-neutral-300 group-hover:text-neutral-900 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Ocupados do bloco selecionado */}
+                  {occupiedInBlock.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest px-1">
+                        Ocupados em {selectedBlock}
+                      </p>
+                      {occupiedInBlock.map(lab => (
+                        <div key={lab.id}
+                          className="w-full p-5 rounded-2xl border bg-neutral-50 border-neutral-200 opacity-60 flex items-center gap-4">
+                          <div className="p-3.5 rounded-xl bg-neutral-100 text-neutral-400">
+                            <Monitor size={22} />
                           </div>
-                          {isFree && <ChevronRight size={20} className="text-neutral-300 group-hover:text-neutral-900 shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })()
-            )}
+                          <div>
+                            <h4 className="font-bold text-base text-neutral-600">{lab.name}</h4>
+                            <p className="text-xs font-medium text-neutral-400 mt-0.5 flex items-center gap-1">
+                              <AlertTriangle size={11} /> Ocupado nos horários selecionados
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <button onClick={() => setStep(2)} className="px-6 py-2 font-bold text-neutral-500 hover:text-neutral-900">Voltar</button>
           </motion.div>
         )}
