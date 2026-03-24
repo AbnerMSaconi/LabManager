@@ -1,0 +1,165 @@
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from datetime import date, datetime
+from typing import List, Optional
+from ..models.base_models import UserRole, ReservationStatus, ItemCategory, ItemStatus
+
+# --- SCHEMAS DE RESERVA ---
+
+class ReservationItemBase(BaseModel):
+    item_model_id: int
+    quantity_requested: int = Field(gt=0)
+
+
+class ReservationCreate(BaseModel):
+    lab_id: Optional[int] = None
+    dates: List[date] = Field(..., min_items=1)
+    slot_ids: List[int] = Field(..., min_items=1)
+    items: List[ReservationItemBase] = Field(default_factory=list)
+
+    requested_softwares: Optional[str] = None   # ex: "AutoCAD, VS Code"
+    software_installation_required: bool = False
+
+    # 🔒 Evita datas duplicadas
+    @field_validator("dates")
+    @classmethod
+    def validate_dates(cls, v):
+        if len(set(v)) != len(v):
+            raise ValueError("Datas duplicadas não são permitidas.")
+        return v
+
+    # 🔒 Evita slots duplicados
+    @field_validator("slot_ids")
+    @classmethod
+    def validate_slots(cls, v):
+        if len(set(v)) != len(v):
+            raise ValueError("Horários (slots) duplicados não são permitidos.")
+        return v
+
+    # 🔒 Regra de consistência
+    @model_validator(mode="after")
+    def validate_context(self):
+        if not self.lab_id and not self.items:
+            raise ValueError("Informe um laboratório ou pelo menos um item.")
+        return self
+
+
+class ReservationReview(BaseModel):
+    # Transições permitidas:
+    # PENDENTE -> APROVADO | REJEITADO
+    # APROVADO -> AGUARDANDO_SOFTWARE
+    # AGUARDANDO_SOFTWARE -> APROVADO
+    status: ReservationStatus
+    rejection_reason: Optional[str] = None
+    approval_notes: Optional[str] = None
+
+
+# --- SCHEMAS DE LOGÍSTICA ---
+
+class CheckoutItem(BaseModel):
+    reservation_item_id: int
+    patrimony_id: Optional[str] = None
+    quantity_delivered: Optional[int] = None
+
+
+class CheckoutRequest(BaseModel):
+    reservation_id: int
+    items: List[CheckoutItem] = Field(..., min_items=1)
+
+
+class CheckinItem(BaseModel):
+    reservation_item_id: int
+    new_status: ItemStatus
+    damage_observation: Optional[str] = None
+    quantity_returned: Optional[int] = None
+
+
+class CheckinRequest(BaseModel):
+    reservation_id: int
+    items: List[CheckinItem] = Field(..., min_items=1)
+
+
+# --- SCHEMAS DE RESPOSTA ---
+
+class UserRead(BaseModel):
+    id: int
+    email: EmailStr
+    full_name: str
+    role: UserRole
+
+    class Config:
+        from_attributes = True
+
+
+# --- SCHEMAS DE USUÁRIOS ---
+
+class UserCreate(BaseModel):
+    registration_number: str
+    full_name: str
+    email: Optional[str] = None
+    password: str
+    role: str = "professor"
+
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+
+class UserReadFull(BaseModel):
+    id: int
+    registration_number: str
+    full_name: str
+    email: Optional[str] = None
+    role: UserRole
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# --- SCHEMAS DE MANUTENÇÃO ---
+
+class TicketCreate(BaseModel):
+    title: str
+    description: str
+    lab_id: Optional[int] = None
+    physical_item_id: Optional[int] = None
+    severity: str = "medio"  # baixo | medio | critico
+
+
+class TicketResolve(BaseModel):
+    resolution_notes: str
+    status: str = "resolvido"  # em_andamento | resolvido
+
+
+# --- SCHEMAS DE LABORATÓRIO ---
+
+class LaboratoryCreate(BaseModel):
+    name: str
+    block: str  # "Bloco A" | "Bloco B" | "Bloco C"
+    room_number: str
+    capacity: int
+    is_practical: bool = False
+    description: Optional[str] = None
+    software_ids: List[int] = []
+
+
+class LaboratoryUpdate(BaseModel):
+    name: Optional[str] = None
+    block: Optional[str] = None
+    room_number: Optional[str] = None
+    capacity: Optional[int] = None
+    is_practical: Optional[bool] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    software_ids: Optional[List[int]] = None
+
+
+# --- SCHEMAS DE SOFTWARE ---
+
+class SoftwareCreate(BaseModel):
+    name: str
+    version: Optional[str] = None

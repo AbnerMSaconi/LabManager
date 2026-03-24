@@ -1,0 +1,164 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./labmanager.db"
+}
+
+// =============================================================
+// ENUMS — alinhados com types.ts e base_models.py (SQLAlchemy)
+// =============================================================
+
+enum UserRole {
+  PROFESSOR       // professor
+  DTI_ESTAGIARIO  // dti_estagiario
+  DTI_TECNICO     // dti_tecnico
+  PROGEX          // progex (coordenação)
+}
+
+enum ReservationStatus {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  EM_USO
+  CONCLUIDO
+  CANCELADO
+  AGUARDANDO_SOFTWARE // reserva aprovada, aguardando DTI instalar software
+}
+
+enum ItemCategory {
+  ELETRICA
+  ELETRONICA
+  FISICA
+  COMPONENTES
+}
+
+enum ItemStatus {
+  DISPONIVEL
+  MANUTENCAO
+  EM_USO
+  BAIXADO
+}
+
+// =============================================================
+// MODELS
+// =============================================================
+
+model User {
+  id                 Int           @id @default(autoincrement())
+  registrationNumber String        @unique // RA (aluno) ou RF (funcionário)
+  email              String?       @unique
+  hashedPassword     String
+  fullName           String
+  role               UserRole      @default(PROFESSOR)
+  isActive           Boolean       @default(true)
+  reservations       Reservation[] @relation("UserReservations")
+  approvedBy         Reservation[] @relation("ApprovedBy")
+}
+
+model LessonSlot {
+  id           Int               @id @default(autoincrement())
+  code         String            @unique // M1, M2, T1, T2, N1, N2
+  startTime    String            // Ex: "19:00"
+  endTime      String            // Ex: "20:40"
+  reservations ReservationSlot[]
+}
+
+model Software {
+  id           Int           @id @default(autoincrement())
+  name         String
+  version      String?
+  laboratories LabSoftware[]
+  reservations Reservation[] @relation("RequestedSoftware")
+}
+
+model LabSoftware {
+  labId      Int
+  softwareId Int
+  laboratory Laboratory @relation(fields: [labId], references: [id])
+  software   Software   @relation(fields: [softwareId], references: [id])
+
+  @@id([labId, softwareId])
+}
+
+model Laboratory {
+  id           Int           @id @default(autoincrement())
+  name         String
+  block        String        // "Bloco A" | "Bloco B" | "Bloco C"
+  roomNumber   String        // Ex: "101"
+  capacity     Int           // Número de máquinas/bancadas
+  isPractical  Boolean       @default(false) // true = Bloco C (aulas práticas)
+  description  String?
+  softwares    LabSoftware[]
+  reservations Reservation[]
+}
+
+model ItemModel {
+  id               Int               @id @default(autoincrement())
+  name             String
+  category         ItemCategory
+  description      String?
+  imageUrl         String?
+  totalStock       Int               @default(0)
+  physicalItems    PhysicalItem[]
+  reservationItems ReservationItem[]
+}
+
+model PhysicalItem {
+  id               Int               @id @default(autoincrement())
+  modelId          Int
+  patrimonyId      String            @unique // Número de patrimônio para QR Code
+  status           ItemStatus        @default(DISPONIVEL)
+  currentLabId     Int?              // Localização atual do equipamento
+  model            ItemModel         @relation(fields: [modelId], references: [id])
+  reservationItems ReservationItem[]
+}
+
+model Reservation {
+  id                           Int               @id @default(autoincrement())
+  userId                       Int
+  labId                        Int?
+  date                         DateTime
+  status                       ReservationStatus @default(PENDENTE)
+  requestedSoftwareId          Int?
+  softwareInstallationRequired Boolean           @default(false)
+  approvedById                 Int?
+  rejectionReason              String?
+  createdAt                    DateTime          @default(now())
+
+  user              User              @relation("UserReservations", fields: [userId], references: [id])
+  approver          User?             @relation("ApprovedBy", fields: [approvedById], references: [id])
+  laboratory        Laboratory?       @relation(fields: [labId], references: [id])
+  requestedSoftware Software?         @relation("RequestedSoftware", fields: [requestedSoftwareId], references: [id])
+  slots             ReservationSlot[]
+  items             ReservationItem[]
+}
+
+model ReservationSlot {
+  reservationId Int
+  slotId        Int
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  slot          LessonSlot  @relation(fields: [slotId], references: [id])
+
+  @@id([reservationId, slotId])
+}
+
+model ReservationItem {
+  id                Int           @id @default(autoincrement())
+  reservationId     Int
+  itemModelId       Int
+  physicalItemId    Int?
+  quantityRequested Int           @default(1)
+  quantityReturned  Int           @default(0)
+  returnStatus      ItemStatus?
+  damageObservation String?
+
+  reservation  Reservation   @relation(fields: [reservationId], references: [id])
+  itemModel    ItemModel     @relation(fields: [itemModelId], references: [id])
+  physicalItem PhysicalItem? @relation(fields: [physicalItemId], references: [id])
+}

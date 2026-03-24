@@ -1,0 +1,5 @@
+{
+  "name": "LabManager Pro",
+  "description": "Sistema de Gerenciamento de Laboratórios e Almoxarifado Universitário com RBAC, Máquina de Estados e Inventário Híbrido via QR Code.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,58 @@
+services:
+
+  # ── Banco de dados PostgreSQL ──────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-labmanager}
+      POSTGRES_USER:     ${POSTGRES_USER:-labmanager}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labmanager123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labmanager}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - labmanager_net
+
+ # ── Backend FastAPI + Gunicorn ─────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: always
+    environment:
+      DATABASE_URL:                  postgresql://${POSTGRES_USER:-labmanager}:${POSTGRES_PASSWORD:-labmanager123}@db:5432/${POSTGRES_DB:-labmanager}
+      SECRET_KEY:                    ${SECRET_KEY:-TROQUE-ESTA-CHAVE-EM-PRODUCAO}
+      ALGORITHM:                     HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES:   ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+    volumes:
+      - ./:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - labmanager_net
+
+  # ── Frontend React + Nginx ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-8088}:80"     # porta 8088 não conflita com sua infra
+    depends_on:
+      - backend
+    networks:
+      - labmanager_net
+
+volumes:
+  postgres_data:
+
+networks:
+  labmanager_net:
+    driver: bridge

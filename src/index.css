@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* ── UCDB Design Tokens ──────────────────────────────────────────── */
+:root {
+  --ucdb-blue:       #003087;
+  --ucdb-blue-dark:  #002060;
+  --ucdb-blue-light: #1a4a9f;
+  --ucdb-gold:       #F5A800;
+  --ucdb-gold-dark:  #c98a00;
+  --ucdb-gold-light: #ffc933;
+
+  --bg-primary:      #ffffff;
+  --bg-secondary:    #f8f9fb;
+  --bg-tertiary:     #f1f4f8;
+  --bg-sidebar:      #002060;
+  --bg-card:         #ffffff;
+
+  --text-primary:    #0f172a;
+  --text-secondary:  #475569;
+  --text-tertiary:   #94a3b8;
+  --text-sidebar:    #e2e8f0;
+  --text-sidebar-muted: #94a3b8;
+
+  --border:          #e2e8f0;
+  --border-strong:   #cbd5e1;
+
+  --accent:          #003087;
+  --accent-hover:    #002060;
+  --accent-text:     #ffffff;
+
+  --gold:            #F5A800;
+  --gold-hover:      #c98a00;
+
+  --success-bg:      #dcfce7;
+  --success-text:    #166534;
+  --warning-bg:      #fef9c3;
+  --warning-text:    #854d0e;
+  --danger-bg:       #fee2e2;
+  --danger-text:     #991b1b;
+  --info-bg:         #dbeafe;
+  --info-text:       #1e40af;
+  --purple-bg:       #ede9fe;
+  --purple-text:     #5b21b6;
+
+  --shadow-sm:       0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:       0 4px 12px rgba(0,0,0,0.10);
+  --radius:          12px;
+  --radius-sm:       8px;
+}
+
+/* ── Dark Mode ───────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-primary:      #0f172a;
+  --bg-secondary:    #1e293b;
+  --bg-tertiary:     #162035;
+  --bg-sidebar:      #020d1f;
+  --bg-card:         #1e293b;
+
+  --text-primary:    #f1f5f9;
+  --text-secondary:  #94a3b8;
+  --text-tertiary:   #64748b;
+  --text-sidebar:    #e2e8f0;
+  --text-sidebar-muted: #64748b;
+
+  --border:          #1e3a5f;
+  --border-strong:   #2d4a7a;
+
+  --accent:          #1a4a9f;
+  --accent-hover:    #003087;
+
+  --success-bg:      #052e16;
+  --success-text:    #86efac;
+  --warning-bg:      #1c1006;
+  --warning-text:    #fcd34d;
+  --danger-bg:       #1c0a0a;
+  --danger-text:     #fca5a5;
+  --info-bg:         #0c1a40;
+  --info-text:       #93c5fd;
+  --purple-bg:       #1e1040;
+  --purple-text:     #c4b5fd;
+
+  --shadow-sm:       0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:       0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ── Base ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
+  margin: 0;
+}
+
+/* ── Utility classes matching design tokens ──────────────────────── */
+.ucdb-bg-primary   { background-color: var(--bg-primary); }
+.ucdb-bg-secondary { background-color: var(--bg-secondary); }
+.ucdb-bg-card      { background-color: var(--bg-card); }
+.ucdb-bg-sidebar   { background-color: var(--bg-sidebar); }
+.ucdb-text         { color: var(--text-primary); }
+.ucdb-text-muted   { color: var(--text-secondary); }
+.ucdb-border       { border-color: var(--border); }
+.ucdb-accent       { background-color: var(--accent); color: var(--accent-text); }
+.ucdb-gold         { background-color: var(--gold); }
+
+/* Scrollbar estilizada */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* Input base */
+input, select, textarea {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--ucdb-blue);
+  box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.15);
+}

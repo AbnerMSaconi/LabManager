@@ -1,0 +1,32 @@
+# Ambiente Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Banco de dados local
+*.db
+*.sqlite3
+
+# Variáveis de ambiente (NUNCA commitar)
+.env
+
+# Node / Frontend
+node_modules/
+dist/
+.cache/
+
+# Logs
+*.log
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Alembic (não versionar banco local)
+alembic/versions/__pycache__/
