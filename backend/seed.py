@@ -147,11 +147,21 @@ def seed_data():
         # ---------------------------------------------------------
         # 5. POVOAMENTO MASSIVO SEMANAL (Segunda a Sexta)
         # ---------------------------------------------------------
+
+        # Limpa reservas existentes para garantir seed idempotente (re-runs não geram conflitos)
+        existing_count = db.query(Reservation).count()
+        if existing_count > 0:
+            db.query(ReservationItem).delete(synchronize_session=False)
+            db.query(ReservationSlot).delete(synchronize_session=False)
+            db.query(Reservation).delete(synchronize_session=False)
+            db.commit()
+            print(f"   ↩️  {existing_count} reservas anteriores removidas (re-seed idempotente).")
+
         users = {u.full_name: u.id for u in db.query(User).all() if u.role == "professor"}
         labs = {l.name: l.id for l in db.query(Laboratory).all()}
         slots = {s.code: s.id for s in db.query(LessonSlot).all()}
         items = {i.name: i.id for i in db.query(ItemModel).all()}
-        
+
         today = date.today()
         # Calcula a Segunda-feira da semana atual
         start_of_week = today - timedelta(days=today.weekday())
@@ -167,7 +177,20 @@ def seed_data():
             ["N1", "N2"], ["N3", "N4"]
         ]
 
+        # Rastreia (lab_name, date_str, slot_code) já usados nesta execução
+        used_slots: set = set()
+
         def create_res(lab_name, user_name, target_date, status, slot_codes, group_id=None, req_soft=None, inst_req=False, app_notes=None, req_items=None):
+            date_str = str(target_date)
+            # Verifica colisão antes de inserir
+            for code in slot_codes:
+                key = (lab_name, date_str, code)
+                if key in used_slots:
+                    return  # Slot já ocupado nesta data — pula para evitar conflito
+            # Marca como ocupado
+            for code in slot_codes:
+                used_slots.add((lab_name, date_str, code))
+
             r = Reservation(
                 lab_id=labs[lab_name], user_id=users[user_name], date=target_date, status=status,
                 group_id=group_id, requested_softwares=req_soft, software_installation_required=inst_req,
@@ -185,7 +208,7 @@ def seed_data():
 
         for j, slot_codes in enumerate(time_blocks):
             for i, lab in enumerate(lab_names):
-                
+
                 # Define se esta combinação Lab+Horário será um "Lote Semestral" (se repete na semana)
                 is_lote = (i + j) % 2 == 0
                 group_id = uuid.uuid4().hex if is_lote else None
@@ -200,19 +223,18 @@ def seed_data():
 
                     # Dinamismo de UI
                     status_val = ReservationStatus.APROVADO.value
-                    req_items = None
+                    req_items_val = None
                     req_soft = None
                     inst_req = False
-                    
+
                     pseudo_rand = i + j + day_offset
 
                     if pseudo_rand % 4 == 0:
-                        # Só fica EM_USO se a data for hoje ou no passado. Se for amanhã, fica APROVADO.
                         status_val = ReservationStatus.EM_USO.value if target_date <= today else ReservationStatus.APROVADO.value
-                        req_items = {"Multímetro Digital": 2}
+                        req_items_val = {"Multímetro Digital": 2}
                     elif pseudo_rand % 5 == 0:
                         status_val = ReservationStatus.APROVADO.value
-                        req_items = {"Kit Arduino Uno": 5}
+                        req_items_val = {"Kit Arduino Uno": 5}
                     elif pseudo_rand % 7 == 0:
                         status_val = ReservationStatus.AGUARDANDO_SOFTWARE.value
                         req_soft = "Visual Studio Code"
@@ -220,11 +242,11 @@ def seed_data():
                     elif pseudo_rand % 11 == 0:
                         status_val = ReservationStatus.PENDENTE.value
 
-                    create_res(lab, prof, target_date, status_val, slot_codes, group_id, req_soft, inst_req, None, req_items)
+                    create_res(lab, prof, target_date, status_val, slot_codes, group_id, req_soft, inst_req, None, req_items_val)
                     total_reservas += 1
 
         db.commit()
-        print(f"✅ ESTRESSE MÁXIMO SEMANAL: {total_reservas} reservas processadas!")
+        print(f"✅ ESTRESSE MÁXIMO SEMANAL: {total_reservas} reservas processadas sem conflitos!")
         print("   Todos os laboratórios estão ocupados de Segunda a Sexta, mesclando Lotes Semestrais e Aulas Avulsas.")
 
     except Exception as e:

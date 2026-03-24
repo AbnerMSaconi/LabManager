@@ -406,6 +406,7 @@ export function ReservationPageDTI() {
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [modal, setModal]               = useState<ModalState>({ type: "none" });
   const [busy, setBusy]                 = useState(false);
+  const [conflictWarning, setConflict]  = useState<string | null>(null);
 
   // ── Filtragem ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -449,8 +450,16 @@ export function ReservationPageDTI() {
 
   const run = async (fn: () => Promise<void>, msg: string) => {
     setBusy(true);
+    setConflict(null);
     try { await fn(); showToast(msg, "success"); refetch(); setModal({ type: "none" }); }
-    catch (e) { showToast(e instanceof ApiError ? e.message : "Erro. Tente novamente.", "error"); }
+    catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        setConflict(e.message);   // Mostra banner de conflito em vez de toast
+        setModal({ type: "none" });
+      } else {
+        showToast(e instanceof ApiError ? e.message : "Erro. Tente novamente.", "error");
+      }
+    }
     finally { setBusy(false); }
   };
 
@@ -526,6 +535,20 @@ export function ReservationPageDTI() {
           labName={modal.labName} professor={modal.professor} softwares={modal.softwares}
           onConfirm={submitSW} onClose={() => setModal({ type: "none" })} loading={busy}
         />
+      )}
+
+      {/* ── Banner de conflito de agenda ── */}
+      {conflictWarning && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+          <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-red-800">Conflito de Agenda Detectado</p>
+            <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
+          </div>
+          <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 shrink-0 mt-0.5">
+            <X size={18} />
+          </button>
+        </div>
       )}
 
       {/* ── Cabeçalho ── */}

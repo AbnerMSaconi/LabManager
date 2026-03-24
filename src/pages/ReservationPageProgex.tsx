@@ -11,13 +11,14 @@
 import React, { useState, useMemo } from "react";
 import {
   CheckCircle2, XCircle, Calendar, Layers, ChevronDown, ChevronUp,
-  CalendarDays, Search, AlertTriangle, Clock, Monitor, Plus,
+  CalendarDays, Search, AlertTriangle, Clock, Monitor, Plus, X,
 } from "lucide-react";
 import { ReservationStatus, Reservation } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi, ReviewPayload } from "../api/reservationsApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
 import { StatusBadge, WEEKDAY_NAMES, TimetableWizard } from "./reservationShared";
+import { ApiError } from "../api/client";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -204,6 +205,7 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
   const [filter, setFilter]             = useState<string>("all");
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [conflictWarning, setConflict]  = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -233,11 +235,15 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
   }, [paginated]);
 
   const handleApprove = async (id: number) => {
+    setConflict(null);
     try {
       await reservationsApi.review(id, { status: ReservationStatus.APROVADO });
       showToast("Reserva aprovada.", "success");
       refetch();
-    } catch { showToast("Erro ao aprovar.", "error"); }
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) setConflict(e.message);
+      else showToast(e instanceof ApiError ? e.message : "Erro ao aprovar.", "error");
+    }
   };
 
   const handleReject = async (id: number) => {
@@ -245,15 +251,19 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
       await reservationsApi.review(id, { status: ReservationStatus.REJEITADO, rejection_reason: "Indisponibilidade" });
       showToast("Reserva rejeitada.", "success");
       refetch();
-    } catch { showToast("Erro ao rejeitar.", "error"); }
+    } catch (e) { showToast(e instanceof ApiError ? e.message : "Erro ao rejeitar.", "error"); }
   };
 
   const handleApproveGroup = async (gid: string) => {
+    setConflict(null);
     try {
       await reservationsApi.reviewGroup(gid, { status: ReservationStatus.APROVADO });
       showToast("Lote aprovado.", "success");
       refetch();
-    } catch { showToast("Erro ao aprovar lote.", "error"); }
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) setConflict(e.message);
+      else showToast(e instanceof ApiError ? e.message : "Erro ao aprovar lote.", "error");
+    }
   };
 
   const handleRejectGroup = async (gid: string) => {
@@ -261,7 +271,7 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
       await reservationsApi.reviewGroup(gid, { status: ReservationStatus.REJEITADO, rejection_reason: "Indisponibilidade no Semestre" });
       showToast("Lote rejeitado.", "success");
       refetch();
-    } catch { showToast("Erro ao rejeitar lote.", "error"); }
+    } catch (e) { showToast(e instanceof ApiError ? e.message : "Erro ao rejeitar lote.", "error"); }
   };
 
   if (viewMode === "timetable") return <TimetableWizard onClose={() => setViewMode("list")} />;
@@ -269,6 +279,20 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
   return (
     <div className="space-y-6 pb-12">
       {ToastComponent}
+
+      {/* Banner de conflito de agenda */}
+      {conflictWarning && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+          <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-red-800">Conflito de Agenda Detectado</p>
+            <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
+          </div>
+          <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 shrink-0 mt-0.5">
+            <X size={18} />
+          </button>
+        </div>
+      )}
 
       {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">

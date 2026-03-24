@@ -219,6 +219,52 @@ class GroupSwapRequest(BaseModel):
     new_lab_id: Optional[int] = None
     new_user_id: Optional[int] = None
 
+
+# ------------------------------------------------------------------
+# Helper: verificação de conflito de agenda na aprovação
+# ------------------------------------------------------------------
+
+# Statuses que "bloqueiam" um slot — só estes causam conflito ao aprovar
+_BLOCKING_STATUSES = [
+    ReservationStatus.APROVADO.value,
+    ReservationStatus.APROVADO_COM_RESSALVAS.value,
+    ReservationStatus.AGUARDANDO_SOFTWARE.value,
+    ReservationStatus.EM_USO.value,
+]
+
+# Statuses que requerem verificação de conflito ao transicionar para eles
+_APPROVAL_TRANSITIONS = [
+    ReservationStatus.APROVADO,
+    ReservationStatus.APROVADO_COM_RESSALVAS,
+    ReservationStatus.AGUARDANDO_SOFTWARE,
+]
+
+def _find_approval_conflict(
+    db: Session,
+    lab_id: int,
+    res_date,
+    slot_ids: list,
+    exclude_ids: list = None,
+):
+    """Retorna a primeira reserva ativa que conflite com lab+data+slots, se houver."""
+    if not slot_ids:
+        return None
+    q = (
+        db.query(Reservation)
+        .options(joinedload(Reservation.user), joinedload(Reservation.laboratory))
+        .join(ReservationSlot, ReservationSlot.reservation_id == Reservation.id)
+        .filter(
+            Reservation.lab_id == lab_id,
+            Reservation.date == res_date,
+            Reservation.status.in_(_BLOCKING_STATUSES),
+            ReservationSlot.slot_id.in_(slot_ids),
+        )
+    )
+    if exclude_ids:
+        q = q.filter(Reservation.id.notin_(exclude_ids))
+    return q.first()
+
+
 @app.patch("/api/v1/reservations/{reservation_id}/review", tags=["reservas"])
 async def review_reservation(
     reservation_id: int,
@@ -247,6 +293,23 @@ async def review_reservation(
             status_code=400,
             detail=f"Transição inválida: {reservation.status} → {review.status.value}. "
         )
+
+    # ── Trava dupla de overbooking na aprovação ──────────────────────────────
+    if review.status in _APPROVAL_TRANSITIONS:
+        slot_ids = [rs.slot_id for rs in db.query(ReservationSlot).filter(ReservationSlot.reservation_id == reservation_id).all()]
+        conflict = _find_approval_conflict(db, reservation.lab_id, reservation.date, slot_ids, exclude_ids=[reservation_id])
+        if conflict:
+            prof = conflict.user.full_name if conflict.user else "outro professor"
+            lab  = conflict.laboratory.name if conflict.laboratory else "o mesmo laboratório"
+            date_fmt = conflict.date.strftime("%d/%m/%Y") if hasattr(conflict.date, "strftime") else str(conflict.date)
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Conflito de agenda: {prof} já possui reserva ativa ({conflict.status}) "
+                    f"em {lab} no dia {date_fmt} para os mesmos horários. "
+                    f"Sugestão: rejeite esta solicitação ou remaneje para outro laboratório/horário."
+                ),
+            )
 
     reservation.status = review.status.value
     reservation.approved_by_id = current_user.id
@@ -281,6 +344,30 @@ async def review_reservation_group(
         ReservationStatus.APROVADO_COM_RESSALVAS.value: [ReservationStatus.APROVADO],
         ReservationStatus.AGUARDANDO_SOFTWARE.value: [ReservationStatus.APROVADO],
     }
+
+    # ── Trava dupla de overbooking na aprovação do lote ─────────────────────
+    if review.status in _APPROVAL_TRANSITIONS:
+        ids_in_group = [r.id for r in reservations]
+        conflicts: list[str] = []
+        for res in reservations:
+            allowed_now = valid_transitions.get(res.status, [])
+            if review.status not in allowed_now:
+                continue  # Só checa datas que seriam aprovadas
+            slot_ids = [rs.slot_id for rs in db.query(ReservationSlot).filter(ReservationSlot.reservation_id == res.id).all()]
+            c = _find_approval_conflict(db, res.lab_id, res.date, slot_ids, exclude_ids=ids_in_group)
+            if c:
+                prof = c.user.full_name if c.user else "outro professor"
+                date_fmt = res.date.strftime("%d/%m/%Y") if hasattr(res.date, "strftime") else str(res.date)
+                conflicts.append(f"• {date_fmt}: conflito com {prof} ({c.status})")
+        if conflicts:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Conflito de agenda em {len(conflicts)} data(s) do lote:\n"
+                    + "\n".join(conflicts)
+                    + "\nSugestão: rejeite este lote ou remaneje para outro laboratório/horário."
+                ),
+            )
 
     updated_count = 0
     for res in reservations:
