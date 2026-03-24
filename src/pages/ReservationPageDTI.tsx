@@ -8,11 +8,11 @@
  *
  * DTI_ESTAGIARIO — somente leitura
  */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   CheckCircle2, XCircle, Calendar, Layers,
   ChevronDown, ChevronUp, CalendarDays, Search,
-  Eye, AlertTriangle, CheckCheck, X, Info, Monitor,
+  Eye, AlertTriangle, CheckCheck, X, Info, Monitor, MoreHorizontal,
 } from "lucide-react";
 import { UserRole, ReservationStatus, Reservation } from "../types";
 import { useAuth } from "../hooks/useAuth";
@@ -136,130 +136,92 @@ function SwModal({
   );
 }
 
-// ─── Célula de ações de uma linha avulsa ─────────────────────────────────────
+// ─── Popover de ações ─────────────────────────────────────────────────────────
 
-function SingleActionCell({
-  r,
+const ACTION_COLORS: Record<string, string> = {
+  emerald: "text-emerald-700 hover:bg-emerald-50",
+  amber:   "text-amber-700 hover:bg-amber-50",
+  purple:  "text-purple-700 hover:bg-purple-50",
+  red:     "text-red-600 hover:bg-red-50",
+  blue:    "text-blue-700 hover:bg-blue-50",
+};
+
+type ActionItem = {
+  label: string;
+  Icon: React.ElementType;
+  color: string;
+  onClick: () => void;
+};
+
+function ActionPopover({
+  status, hasSW,
   onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
 }: {
-  r: Reservation;
+  status: ReservationStatus; hasSW: boolean;
   onApprove: () => void; onCaveats: () => void;
   onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
 }) {
-  const hasSW = !!r.requested_softwares && r.software_installation_required;
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  if (r.status === ReservationStatus.PENDENTE) {
-    return (
-      <div className="flex flex-col gap-1.5 items-end">
-        <div className="flex gap-1.5">
-          <button onClick={onApprove}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 border border-emerald-200 transition-colors">
-            <CheckCircle2 size={13} /> Aprovar
-          </button>
-          <button onClick={onCaveats}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg font-bold text-xs hover:bg-amber-100 border border-amber-200 transition-colors">
-            <AlertTriangle size={13} /> Ressalvas
-          </button>
-        </div>
-        <div className="flex gap-1.5">
-          {hasSW && (
-            <button onClick={onScheduleSW}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 text-purple-700 rounded-lg font-bold text-xs hover:bg-purple-100 border border-purple-200 transition-colors">
-              <Monitor size={13} /> Ag. Software
-            </button>
-          )}
-          <button onClick={onReject}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 rounded-lg font-bold text-xs hover:bg-red-100 border border-red-200 transition-colors">
-            <XCircle size={13} /> Rejeitar
-          </button>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
-  if (r.status === ReservationStatus.APROVADO_COM_RESSALVAS) {
-    return (
-      <button onClick={onApprove}
-        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 border border-emerald-200 transition-colors">
-        <CheckCheck size={13} /> Aprovar Definitivo
-      </button>
-    );
-  }
-
-  if (r.status === ReservationStatus.AGUARDANDO_SOFTWARE) {
-    return (
-      <button onClick={onConfirmSW}
-        className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold text-xs hover:bg-blue-100 border border-blue-200 transition-colors">
-        <CheckCheck size={13} /> SW Instalado
-      </button>
-    );
-  }
-
-  return null;
-}
-
-// ─── Célula de ações de um lote ───────────────────────────────────────────────
-
-function GroupActionCell({
-  group,
-  onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
-}: {
-  group: Reservation[];
-  onApprove: () => void; onCaveats: () => void;
-  onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
-}) {
-  const first  = group[0];
-  const hasSW  = !!first.requested_softwares && first.software_installation_required;
-  const status = first.status;
+  const actions: ActionItem[] = [];
 
   if (status === ReservationStatus.PENDENTE) {
-    return (
-      <div className="flex flex-col gap-1.5 items-end">
-        <div className="flex gap-1.5">
-          <button onClick={onApprove}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 border border-emerald-200 transition-colors">
-            <CheckCircle2 size={13} /> Aprovar Lote
-          </button>
-          <button onClick={onCaveats}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg font-bold text-xs hover:bg-amber-100 border border-amber-200 transition-colors">
-            <AlertTriangle size={13} /> Ressalvas
-          </button>
-        </div>
-        <div className="flex gap-1.5">
-          {hasSW && (
-            <button onClick={onScheduleSW}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 text-purple-700 rounded-lg font-bold text-xs hover:bg-purple-100 border border-purple-200 transition-colors">
-              <Monitor size={13} /> Ag. Software
-            </button>
-          )}
-          <button onClick={onReject}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 rounded-lg font-bold text-xs hover:bg-red-100 border border-red-200 transition-colors">
-            <XCircle size={13} /> Rejeitar Lote
-          </button>
-        </div>
-      </div>
-    );
+    actions.push({ label: "Aprovar",               Icon: CheckCircle2,   color: "emerald", onClick: onApprove });
+    actions.push({ label: "Aprovar com Ressalvas",  Icon: AlertTriangle,  color: "amber",   onClick: onCaveats });
+    if (hasSW)
+      actions.push({ label: "Agendar Software",    Icon: Monitor,        color: "purple",  onClick: onScheduleSW });
+    actions.push({ label: "Rejeitar",               Icon: XCircle,        color: "red",     onClick: onReject });
+  } else if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
+    actions.push({ label: "Confirmar Aprovação",    Icon: CheckCheck,     color: "emerald", onClick: onApprove });
+    actions.push({ label: "Rejeitar",               Icon: XCircle,        color: "red",     onClick: onReject });
+  } else if (status === ReservationStatus.AGUARDANDO_SOFTWARE) {
+    actions.push({ label: "Confirmar Instalação",   Icon: CheckCheck,     color: "blue",    onClick: onConfirmSW });
+    actions.push({ label: "Rejeitar",               Icon: XCircle,        color: "red",     onClick: onReject });
   }
 
-  if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
-    return (
-      <button onClick={onApprove}
-        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 border border-emerald-200 transition-colors">
-        <CheckCheck size={13} /> Aprovar Definitivo
+  if (actions.length === 0) return null;
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+          open
+            ? "bg-neutral-900 text-white border-neutral-900"
+            : "bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200"
+        }`}
+      >
+        <MoreHorizontal size={14} />
       </button>
-    );
-  }
 
-  if (status === ReservationStatus.AGUARDANDO_SOFTWARE) {
-    return (
-      <button onClick={onConfirmSW}
-        className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-bold text-xs hover:bg-blue-100 border border-blue-200 transition-colors">
-        <CheckCheck size={13} /> SW Instalado
-      </button>
-    );
-  }
-
-  return null;
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-40 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden w-52">
+          <div className="py-1">
+            {actions.map(({ label, Icon, color, onClick }) => (
+              <button
+                key={label}
+                onClick={() => { onClick(); setOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors ${ACTION_COLORS[color]}`}
+              >
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Linha avulsa ─────────────────────────────────────────────────────────────
@@ -311,11 +273,14 @@ function SingleRow({
       </td>
       <td className="px-4 py-4"><StatusBadge status={r.status} /></td>
       <td className="px-4 py-4 text-right">
-        {canApprove
-          ? <SingleActionCell r={r} onApprove={onApprove} onCaveats={onCaveats}
-              onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject} />
-          : null
-        }
+        {canApprove && (
+          <ActionPopover
+            status={r.status}
+            hasSW={!!r.requested_softwares && !!r.software_installation_required}
+            onApprove={onApprove} onCaveats={onCaveats}
+            onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject}
+          />
+        )}
       </td>
     </tr>
   );
@@ -408,11 +373,14 @@ function GroupRow({
       </td>
       <td className="px-4 py-4"><StatusBadge status={first.status} /></td>
       <td className="px-4 py-4 text-right">
-        {canApprove
-          ? <GroupActionCell group={group} onApprove={onApprove} onCaveats={onCaveats}
-              onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject} />
-          : null
-        }
+        {canApprove && (
+          <ActionPopover
+            status={first.status}
+            hasSW={!!first.requested_softwares && !!first.software_installation_required}
+            onApprove={onApprove} onCaveats={onCaveats}
+            onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject}
+          />
+        )}
       </td>
     </tr>
   );
