@@ -3,11 +3,17 @@ import { Reservation, ReservationStatus } from "../types";
 
 export interface CreateReservationPayload {
   lab_id?: number;
-  date: string;
+  dates: string[];
   slot_ids: number[];
   items: { item_model_id: number; quantity_requested: number }[];
-  requested_software_id?: number;
+  requested_softwares?: string;
   software_installation_required?: boolean;
+}
+
+export interface CreateReservationResponse {
+  message: string;
+  group_id: string | null;
+  ids: number[];
 }
 
 export interface ReviewPayload {
@@ -23,7 +29,7 @@ export const reservationsApi = {
   listToday: () => api.get<Reservation[]>("/api/v1/reservations/today"),
   listByDate: (date: string) => api.get<Reservation[]>(`/api/v1/reservations/date/${date}`),
   listAwaitingSoftware: () => api.get<Reservation[]>("/api/v1/reservations/awaiting-software"),
-  create: (payload: CreateReservationPayload) => api.post<{ id: number; message: string }>("/api/v1/reservations", payload),
+  create: (payload: CreateReservationPayload) => api.post<CreateReservationResponse>("/api/v1/reservations", payload),
   review: (id: number, payload: ReviewPayload) => api.patch<{ message: string }>(`/api/v1/reservations/${id}/review`, payload),
   reviewGroup: (groupId: string, payload: ReviewPayload) => 
     api.patch<{ message: string }>(`/api/v1/reservations/group/${groupId}/review`, payload),

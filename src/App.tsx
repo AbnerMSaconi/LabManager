@@ -36,14 +36,14 @@ function useDarkMode() {
 interface MenuItem { id: string; label: string; icon: React.ElementType; roles: UserRole[] }
 
 const MENU_ITEMS: MenuItem[] = [
-  { id: "dashboard",    label: "Início",          icon: LayoutDashboard, roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX] },
-  { id: "daily",        label: "Agenda do Dia",   icon: Clock,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO] },
-  { id: "reservations", label: "Reservas",         icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX] },
-  { id: "inventory",    label: "Almoxarifado",     icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR] },
-  { id: "labs",         label: "Laboratórios",     icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR] },
-  { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO] },
-  { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX] },
-  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROGEX] },
+  { id: "dashboard",    label: "Início",          icon: LayoutDashboard, roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
+  { id: "daily",        label: "Agenda do Dia",   icon: Clock,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
+  { id: "reservations", label: "Reservas",         icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
+  { id: "inventory",    label: "Almoxarifado",     icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR] },
+  { id: "labs",         label: "Laboratórios",     icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR] },
+  { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
+  { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
+  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROGEX, UserRole.ADMINISTRADOR] },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -51,6 +51,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.DTI_ESTAGIARIO]:  "DTI Estagiário",
   [UserRole.DTI_TECNICO]:     "DTI Técnico",
   [UserRole.PROGEX]:          "Progex · Admin",
+  [UserRole.ADMINISTRADOR]:   "Administrador",
 };
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -222,7 +223,7 @@ function Shell() {
                 </motion.div>
               ) : (
                 <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                  {activeTab === "dashboard"    && <DashboardPage onNewReservation={() => setShowWizard(true)} />}
+                  {activeTab === "dashboard"    && <DashboardPage onNewReservation={() => setShowWizard(true)} onNavigate={setActiveTab} />}
                   {activeTab === "daily"        && <DailyPage />}
                   {activeTab === "reservations" && <ReservationsPage onNewReservation={() => setShowWizard(true)} />}
                   {activeTab === "inventory"    && <InventoryPage />}

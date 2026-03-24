@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
 import { labsApi } from "../api/labsApi";
+import { maintenanceApi } from "../api/maintenanceApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -162,9 +163,10 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
 // DASHBOARD DTI
 // ============================================================================
 function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
-  const { data: pending } = useFetch(reservationsApi.listPending);
-  const { data: today }   = useFetch(reservationsApi.listToday);
+  const { data: pending }  = useFetch(reservationsApi.listPending);
+  const { data: today }    = useFetch(reservationsApi.listToday);
   const { data: software } = useFetch(reservationsApi.listAwaitingSoftware);
+  const { data: tickets }  = useFetch(maintenanceApi.list);
 
   return (
     <div className="space-y-8 pb-12 w-full">
@@ -216,9 +218,9 @@ function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: "Tickets Abertos", value: "0" },
-            { label: "Em Andamento",    value: "0" },
-            { label: "Críticos",        value: "0", highlight: true },
+            { label: "Tickets Abertos", value: tickets?.filter(t => t.status === "aberto").length ?? "—" },
+            { label: "Em Andamento",    value: tickets?.filter(t => t.status === "em_andamento").length ?? "—" },
+            { label: "Críticos",        value: tickets?.filter(t => t.severity === "critico" && t.status !== "resolvido").length ?? "—", highlight: true },
           ].map(stat => (
             <div key={stat.label} className={`bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all ${stat.highlight ? 'border-red-200 bg-red-50/50' : 'border-neutral-200'}`}>
               <p className={`text-[10px] md:text-xs font-bold uppercase mb-1 ${stat.highlight ? 'text-red-500' : 'text-neutral-400'}`}>{stat.label}</p>
@@ -253,7 +255,7 @@ function ProfessorDashboard({ onNewReservation }: { onNewReservation: () => void
   const groupedReservations = useMemo(() => {
     let filtered = data || [];
     if (weekdayFilter !== "all") {
-      filtered = filtered.filter(r => new Date(r.date).getDay().toString() === weekdayFilter);
+      filtered = filtered.filter(r => new Date(r.date + "T12:00:00").getDay().toString() === weekdayFilter);
     }
 
     const groups: Record<string, Reservation[]> = {};
@@ -427,6 +429,6 @@ export function DashboardPage({ onNewReservation, onNavigate }: { onNewReservati
   if (!user) return null;
 
   if (user.role === UserRole.PROFESSOR) return <ProfessorDashboard onNewReservation={onNewReservation} />;
-  if (user.role === UserRole.PROGEX) return <ProgexDashboard onNavigate={onNavigate} />;
+  if (user.role === UserRole.PROGEX || user.role === UserRole.ADMINISTRADOR) return <ProgexDashboard onNavigate={onNavigate} />;
   return <DTIDashboard onNavigate={onNavigate} />;
 }

@@ -13,6 +13,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.DTI_ESTAGIARIO]: "DTI Estagiário",
   [UserRole.DTI_TECNICO]:    "DTI Técnico",
   [UserRole.PROGEX]:         "Progex (Admin)",
+  [UserRole.ADMINISTRADOR]:  "Administrador",
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
@@ -20,6 +21,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.DTI_ESTAGIARIO]: "bg-amber-50 text-amber-700",
   [UserRole.DTI_TECNICO]:    "bg-purple-50 text-purple-700",
   [UserRole.PROGEX]:         "bg-emerald-50 text-emerald-700",
+  [UserRole.ADMINISTRADOR]:  "bg-red-50 text-red-700",
 };
 
 // Legenda de permissões por papel
@@ -38,6 +40,10 @@ const PERMISSIONS: Record<UserRole, { can: string[]; cannot: string[] }> = {
   },
   [UserRole.PROGEX]: {
     can: ["Acesso total ao sistema", "Criar e desativar usuários", "Gerenciar laboratórios", "Solicitar reservas semestrais"],
+    cannot: [],
+  },
+  [UserRole.ADMINISTRADOR]: {
+    can: ["Acesso total ao sistema", "Criar e desativar usuários", "Gerenciar laboratórios", "Todas as operações"],
     cannot: [],
   },
 };

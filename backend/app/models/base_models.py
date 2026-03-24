@@ -31,9 +31,7 @@ class ReservationStatus(enum.Enum):
 class LaboratoryBlock(enum.Enum):
     BLOCO_A = "Bloco A"
     BLOCO_B = "Bloco B"
-    BLOCO_C_INDO = "Bloco C - INFO"
-    BLOCO_C_ESP = "Bloco C - Específicos"
-    BLOCO_M = "Bloco M"
+    BLOCO_C = "Bloco C"
 class ItemCategory(enum.Enum):
     ELETRICA   = "eletrica"
     ELETRONICA = "eletronica"
@@ -134,7 +132,6 @@ class PhysicalItem(Base):
 class Reservation(Base):
     __tablename__ = "reservations"
     id:                            Mapped[int]                      =   mapped_column(primary_key=True)
-    group_id:                      Mapped[Optional[str]]            =   mapped_column(String(50), index=True)
     user_id:                       Mapped[int]                      =   mapped_column(ForeignKey("users.id"))
     lab_id:                        Mapped[Optional[int]]            =   mapped_column(ForeignKey("laboratories.id"))
     date:                          Mapped[datetime.date]            =   mapped_column(Date)
@@ -145,11 +142,11 @@ class Reservation(Base):
     approved_by_id:                Mapped[Optional[int]]            =   mapped_column(ForeignKey("users.id"))
     rejection_reason:              Mapped[Optional[str]]            =   mapped_column(Text)
     created_at:                    Mapped[datetime]                 =   mapped_column(default=datetime.utcnow)
+    group_id:                      Mapped[Optional[str]]            =   mapped_column(String(50), index=True)
     slots:                         Mapped[List["LessonSlot"]]       =   relationship(secondary="reservation_slots")
     items:                         Mapped[List["ReservationItem"]]  =   relationship(back_populates="reservation")
     user:                          Mapped["User"]                   =   relationship(foreign_keys=[user_id])
     laboratory:                    Mapped[Optional["Laboratory"]]   =   relationship(foreign_keys=[lab_id])
-    group_id:                      Mapped[Optional[str]]            =   mapped_column(String(50), index=True)
 
 class ReservationSlot(Base):
     __tablename__ = "reservation_slots"

@@ -3,6 +3,7 @@ export enum UserRole {
   DTI_ESTAGIARIO = "dti_estagiario",
   DTI_TECNICO = "dti_tecnico",
   PROGEX = "progex",
+  ADMINISTRADOR = "administrador",
 }
 
 export enum ReservationStatus {

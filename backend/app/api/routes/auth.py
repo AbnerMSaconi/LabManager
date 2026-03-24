@@ -26,15 +26,16 @@ async def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestF
             detail="E-mail ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # 3. Gerar Token
-    access_token = security.create_access_token(subject=user.id)
-    
+
+    # 3. Verificar se a conta está ativa antes de gerar token
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Conta desativada. Contate o administrador.",
         )
+
+    # 4. Gerar Token
+    access_token = security.create_access_token(subject=user.id)
 
     return {
         "access_token": access_token,
@@ -44,6 +45,6 @@ async def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestF
             "registration_number": user.registration_number,
             "full_name": user.full_name,
             "email": user.email,
-            "role": user.role,
+            "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
         },
     }

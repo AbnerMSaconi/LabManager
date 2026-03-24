@@ -190,58 +190,6 @@ async def list_my_reservations(
     ).order_by(Reservation.created_at.desc()).all()
 
 
-@app.post("/api/v1/reservations", status_code=status.HTTP_201_CREATED, tags=["reservas"])
-async def create_reservation(
-    reservation_in: ReservationCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROFESSOR, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
-):
-    # 1. TRAVA DE OVERBOOKING: Verifica se já existe reserva ativa para os mesmos slots no mesmo dia
-    active_statuses = [
-        ReservationStatus.PENDENTE.value,
-        ReservationStatus.APROVADO.value,
-        ReservationStatus.AGUARDANDO_SOFTWARE.value,
-        ReservationStatus.EM_USO.value
-    ]
-    
-    conflict = db.query(Reservation).join(ReservationSlot).filter(
-        Reservation.lab_id == reservation_in.lab_id,
-        Reservation.date == reservation_in.date,
-        Reservation.status.in_(active_statuses),
-        ReservationSlot.slot_id.in_(reservation_in.slot_ids)
-    ).first()
-
-    if conflict:
-        raise HTTPException(
-            status_code=400, 
-            detail="Conflito de agenda: O laboratório já está reservado ou aguardando aprovação para os horários selecionados."
-        )
-
-    # 2. Criação normal caso não haja conflito
-    new_reservation = Reservation(
-        lab_id=reservation_in.lab_id,
-        date=reservation_in.date,
-        user_id=current_user.id,
-        status=ReservationStatus.PENDENTE.value,
-        requested_softwares=reservation_in.requested_softwares,
-        software_installation_required=reservation_in.software_installation_required,
-    )
-    db.add(new_reservation)
-    db.flush()
-
-    for slot_id in reservation_in.slot_ids:
-        db.add(ReservationSlot(reservation_id=new_reservation.id, slot_id=slot_id))
-
-    for item_in in reservation_in.items:
-        db.add(ReservationItem(
-            reservation_id=new_reservation.id,
-            item_model_id=item_in.item_model_id,
-            quantity_requested=item_in.quantity_requested,
-        ))
-
-    db.commit()
-    db.refresh(new_reservation)
-    return {"message": "Reserva criada com sucesso.", "id": new_reservation.id}
 @app.get("/api/v1/reservations/date/{query_date}", tags=["reservas"])
 async def list_reservations_by_date(
     query_date: str,
@@ -736,17 +684,10 @@ async def create_lab(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR]))
 ):
-    from .models.base_models import LaboratoryBlock as LB
-    block_map = {
-        "Bloco A": LB.BLOCO_A.value if hasattr(LB, 'BLOCO_A') else "Bloco A", 
-        "Bloco B": LB.BLOCO_B.value if hasattr(LB, 'BLOCO_B') else "Bloco B", 
-        "Bloco C - INFO": "Bloco C - INFO", 
-        "Bloco C - Específicos": "Bloco C - Específicos", 
-        "Bloco M": "Bloco M"
-    }
-    block = block_map.get(payload.block)
-    if not block:
-        raise HTTPException(status_code=400, detail=f"Bloco inválido: {payload.block}")
+    VALID_BLOCKS = {"Bloco A", "Bloco B", "Bloco C"}
+    if payload.block not in VALID_BLOCKS:
+        raise HTTPException(status_code=400, detail=f"Bloco inválido: {payload.block}. Use: {', '.join(sorted(VALID_BLOCKS))}")
+    block = payload.block
     lab = Laboratory(
         name=payload.name, block=block, room_number=payload.room_number,
         capacity=payload.capacity, is_practical=payload.is_practical,
@@ -770,18 +711,16 @@ async def update_lab(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR]))
 ):
-    from .models.base_models import LaboratoryBlock as LB
     lab = db.query(Laboratory).options(joinedload(Laboratory.softwares)).filter(Laboratory.id == lab_id).first()
     if not lab:
         raise HTTPException(status_code=404, detail="Laboratório não encontrado.")
-    
-    # Correção: .value inserido no mapeamento
-    block_map = {"Bloco A": LB.BLOCO_A.value, "Bloco B": LB.BLOCO_B.value, "Bloco C": LB.BLOCO_C.value}
+
+    VALID_BLOCKS = {"Bloco A", "Bloco B", "Bloco C"}
     if payload.name        is not None: lab.name        = payload.name
     if payload.block       is not None:
-        b = block_map.get(payload.block)
-        if not b: raise HTTPException(status_code=400, detail=f"Bloco inválido: {payload.block}")
-        lab.block = b
+        if payload.block not in VALID_BLOCKS:
+            raise HTTPException(status_code=400, detail=f"Bloco inválido: {payload.block}. Use: {', '.join(sorted(VALID_BLOCKS))}")
+        lab.block = payload.block
     if payload.room_number  is not None: lab.room_number  = payload.room_number
     if payload.capacity     is not None: lab.capacity     = payload.capacity
     if payload.is_practical is not None: lab.is_practical = payload.is_practical
