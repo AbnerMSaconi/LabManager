@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import date, datetime
 from typing import List, Optional
 from ..models.base_models import UserRole, ReservationStatus, ItemCategory, ItemStatus
@@ -12,8 +12,8 @@ class ReservationItemBase(BaseModel):
 
 class ReservationCreate(BaseModel):
     lab_id: Optional[int] = None
-    dates: List[date] = Field(..., min_items=1)
-    slot_ids: List[int] = Field(..., min_items=1)
+    dates: List[date] = Field(..., min_length=1)
+    slot_ids: List[int] = Field(..., min_length=1)
     items: List[ReservationItemBase] = Field(default_factory=list)
 
     requested_softwares: Optional[str] = None   # ex: "AutoCAD, VS Code"
@@ -63,7 +63,7 @@ class CheckoutItem(BaseModel):
 
 class CheckoutRequest(BaseModel):
     reservation_id: int
-    items: List[CheckoutItem] = Field(..., min_items=1)
+    items: List[CheckoutItem] = Field(..., min_length=1)
 
 
 class CheckinItem(BaseModel):
@@ -75,14 +75,14 @@ class CheckinItem(BaseModel):
 
 class CheckinRequest(BaseModel):
     reservation_id: int
-    items: List[CheckinItem] = Field(..., min_items=1)
+    items: List[CheckinItem] = Field(..., min_length=1)
 
 
 # --- SCHEMAS DE RESPOSTA ---
 
 class UserRead(BaseModel):
     id: int
-    email: EmailStr
+    registration_number: str
     full_name: str
     role: UserRole
 
@@ -95,14 +95,12 @@ class UserRead(BaseModel):
 class UserCreate(BaseModel):
     registration_number: str
     full_name: str
-    email: Optional[str] = None
     password: str
-    role: str = "professor"
+    role: UserRole = UserRole.PROFESSOR
 
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
-    email: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
@@ -112,7 +110,6 @@ class UserReadFull(BaseModel):
     id: int
     registration_number: str
     full_name: str
-    email: Optional[str] = None
     role: UserRole
     is_active: bool
 

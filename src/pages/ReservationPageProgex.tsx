@@ -17,7 +17,7 @@ import { ReservationStatus, Reservation } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi, ReviewPayload } from "../api/reservationsApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
-import { StatusBadge, WEEKDAY_NAMES, TimetableWizard } from "./reservationShared";
+import { StatusBadge, WEEKDAY_NAMES, TimetableWizard, SoftwareBadge, MaterialsBadge } from "./reservationShared";
 import { ApiError } from "../api/client";
 
 const ITEMS_PER_PAGE = 15;
@@ -87,12 +87,8 @@ function TableRow({
       <td className="px-6 py-4">
         <p className="text-sm font-bold text-neutral-700">{r.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1.5 mt-1 flex-wrap">
-          {r.items && r.items.length > 0 && (
-            <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">Materiais</span>
-          )}
-          {r.requested_softwares && (
-            <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">Software</span>
-          )}
+          {r.items && r.items.length > 0 && <MaterialsBadge items={r.items} />}
+          {r.requested_softwares && <SoftwareBadge softwares={r.requested_softwares} />}
         </div>
       </td>
       <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
@@ -169,12 +165,8 @@ function GroupRow({
       <td className="px-6 py-4">
         <p className="text-sm font-bold text-neutral-700">{first.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1.5 mt-1 flex-wrap">
-          {first.items && first.items.length > 0 && (
-            <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">Materiais</span>
-          )}
-          {first.requested_softwares && (
-            <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">Software</span>
-          )}
+          {first.items && first.items.length > 0 && <MaterialsBadge items={first.items} />}
+          {first.requested_softwares && <SoftwareBadge softwares={first.requested_softwares} />}
         </div>
       </td>
       <td className="px-6 py-4"><StatusBadge status={first.status} /></td>

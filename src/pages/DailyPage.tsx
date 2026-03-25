@@ -431,7 +431,7 @@ export function DailyPage() {
         </div>
 
         {/* Linha 2: Turnos, Blocos e Legenda */}
-        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4 px-5 py-3">
+        <div className="flex flex-col 3xl:flex-row 2xl:items-center justify-between gap-4 px-5 py-3">
           
           <div className="flex flex-col md:flex-row md:items-center gap-4 w-full 2xl:w-auto overflow-x-auto no-scrollbar">
             {/* Filtros de Turno */}

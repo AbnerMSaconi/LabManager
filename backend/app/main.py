@@ -466,6 +466,17 @@ async def checkout_items(
         elif item_in.quantity_delivered is not None:
             res_item.quantity_requested = item_in.quantity_delivered
 
+        # Log de movimentação
+        prof_name = reservation.user.full_name if reservation.user else f"Usuário #{reservation.user_id}"
+        db.add(InventoryMovement(
+            item_model_id=res_item.item_model_id,
+            action="saida",
+            quantity=res_item.quantity_requested,
+            operator_id=current_user.id,
+            target=prof_name,
+            reservation_id=reservation.id,
+        ))
+
     reservation.status = ReservationStatus.EM_USO.value # Correção
     db.commit()
     return {"message": "Checkout realizado com sucesso."}
@@ -497,6 +508,20 @@ async def checkin_items(
         if item_in.quantity_returned is not None:
             res_item.quantity_returned = item_in.quantity_returned
 
+        # Log de movimentação
+        qty_returned = item_in.quantity_returned if item_in.quantity_returned is not None else res_item.quantity_requested
+        prof_name = reservation.user.full_name if reservation.user else f"Usuário #{reservation.user_id}"
+        obs = item_in.damage_observation if item_in.damage_observation else None
+        db.add(InventoryMovement(
+            item_model_id=res_item.item_model_id,
+            action="entrada",
+            quantity=qty_returned,
+            operator_id=current_user.id,
+            target=prof_name,
+            reservation_id=reservation.id,
+            observation=obs,
+        ))
+
         if res_item.physical_item_id:
             phys_item = db.query(PhysicalItem).filter(
                 PhysicalItem.id == res_item.physical_item_id
@@ -519,8 +544,6 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "id": current_user.id,
         "registration_number": current_user.registration_number,
         "full_name": current_user.full_name,
-        "email": current_user.email,
-        # Defesa contra falha, dependendo se vem string ou enum
         "role": current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
     }
 
@@ -682,7 +705,7 @@ async def list_available_models(
 
 
 from .schemas.reservation_schemas import ItemModelCreate, ItemModelUpdate, AddReservationItemsRequest, InstitutionLoanCreate, InstitutionLoanReturn
-from .models.base_models import InstitutionLoan
+from .models.base_models import InstitutionLoan, InventoryMovement
 
 
 @app.post("/api/v1/inventory/item-models", status_code=status.HTTP_201_CREATED, tags=["inventário"])
@@ -796,6 +819,68 @@ async def add_items_to_reservation(
     return {"message": "Materiais adicionados à reserva com sucesso."}
 
 
+@app.get("/api/v1/inventory/stock", tags=["inventário"])
+async def get_realtime_stock(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Estoque em tempo real: total_stock - itens em uso (EM_USO) - empréstimos em aberto."""
+    in_use_rows = db.query(
+        ReservationItem.item_model_id,
+        func.sum(ReservationItem.quantity_requested).label("total"),
+    ).join(Reservation).filter(
+        Reservation.status == ReservationStatus.EM_USO.value,
+    ).group_by(ReservationItem.item_model_id).all()
+    in_use_map = {r.item_model_id: r.total for r in in_use_rows}
+
+    loan_rows = db.query(
+        InstitutionLoan.item_model_id,
+        func.sum(InstitutionLoan.quantity_delivered - InstitutionLoan.quantity_returned).label("total"),
+    ).filter(InstitutionLoan.status == "em_aberto").group_by(InstitutionLoan.item_model_id).all()
+    loan_map = {r.item_model_id: r.total for r in loan_rows}
+
+    models = db.query(ItemModel).all()
+    return [
+        {
+            "id": m.id, "name": m.name, "category": m.category,
+            "description": m.description, "image_url": m.image_url,
+            "total_stock": m.total_stock,
+            "in_use": in_use_map.get(m.id, 0),
+            "in_loans": loan_map.get(m.id, 0),
+            "available_qty": max(0, m.total_stock - in_use_map.get(m.id, 0) - loan_map.get(m.id, 0)),
+        }
+        for m in models
+    ]
+
+
+@app.get("/api/v1/inventory/movements", tags=["inventário"])
+async def list_inventory_movements(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    movements = db.query(InventoryMovement).options(
+        joinedload(InventoryMovement.model),
+        joinedload(InventoryMovement.operator),
+    ).order_by(InventoryMovement.created_at.desc()).limit(1000).all()
+    return [
+        {
+            "id": m.id,
+            "item_model_id": m.item_model_id,
+            "action": m.action,
+            "quantity": m.quantity,
+            "operator_id": m.operator_id,
+            "target": m.target,
+            "reservation_id": m.reservation_id,
+            "loan_id": m.loan_id,
+            "observation": m.observation,
+            "created_at": m.created_at.isoformat(),
+            "model": {"id": m.model.id, "name": m.model.name, "category": m.model.category} if m.model else None,
+            "operator": {"id": m.operator.id, "full_name": m.operator.full_name, "role": m.operator.role.value if hasattr(m.operator.role, 'value') else str(m.operator.role)} if m.operator else None,
+        }
+        for m in movements
+    ]
+
+
 @app.get("/api/v1/inventory/pending-requests", tags=["inventário"])
 async def list_pending_material_requests(
     db: Session = Depends(get_db),
@@ -811,7 +896,31 @@ async def list_pending_material_requests(
         Reservation.status.in_(approved_statuses),
         Reservation.items.any(),
     ).order_by(Reservation.date).all()
-    return reservations
+    return [
+        {
+            "id": r.id,
+            "date": r.date.isoformat() if r.date else None,
+            "status": r.status,
+            "group_id": r.group_id,
+            "user": {"id": r.user.id, "full_name": r.user.full_name, "role": r.user.role} if r.user else None,
+            "laboratory": {"id": r.laboratory.id, "name": r.laboratory.name, "block": r.laboratory.block} if r.laboratory else None,
+            "slots": [{"id": s.id, "code": s.code, "start_time": s.start_time, "end_time": s.end_time} for s in r.slots],
+            "items": [
+                {
+                    "id": i.id,
+                    "item_model_id": i.item_model_id,
+                    "physical_item_id": i.physical_item_id,
+                    "quantity_requested": i.quantity_requested,
+                    "quantity_returned": i.quantity_returned,
+                    "return_status": i.return_status,
+                    "damage_observation": i.damage_observation,
+                    "model": {"id": i.model.id, "name": i.model.name, "category": i.model.category} if i.model else None,
+                }
+                for i in r.items
+            ],
+        }
+        for r in reservations
+    ]
 
 
 @app.post("/api/v1/logistics/loans", status_code=status.HTTP_201_CREATED, tags=["logística"])
@@ -832,6 +941,15 @@ async def create_institution_loan(
         created_by_id=current_user.id,
     )
     db.add(loan)
+    db.flush()
+    db.add(InventoryMovement(
+        item_model_id=payload.item_model_id,
+        action="emprestimo",
+        quantity=payload.quantity_delivered,
+        operator_id=current_user.id,
+        target=payload.requester_name,
+        loan_id=loan.id,
+    ))
     db.commit()
     db.refresh(loan)
     return {"message": "Empréstimo registrado.", "id": loan.id}
@@ -881,11 +999,22 @@ async def return_institution_loan(
     if payload.has_damage and not payload.damage_observation:
         raise HTTPException(status_code=400, detail="Descreva a avaria ocorrida.")
 
-    loan.quantity_returned = payload.quantity_returned if not payload.all_returned else loan.quantity_delivered
+    qty_ret = payload.quantity_returned if not payload.all_returned else loan.quantity_delivered
+    loan.quantity_returned = qty_ret
     loan.damage_observation = payload.damage_observation if payload.has_damage else None
     loan.is_operational = payload.is_operational if payload.has_damage else None
     loan.returned_at = _dt.utcnow()
     loan.status = "devolvido_com_avaria" if payload.has_damage else "devolvido"
+    obs = payload.damage_observation if payload.has_damage else None
+    db.add(InventoryMovement(
+        item_model_id=loan.item_model_id,
+        action="devolucao",
+        quantity=qty_ret,
+        operator_id=current_user.id,
+        target=loan.requester_name,
+        loan_id=loan_id,
+        observation=obs,
+    ))
     db.commit()
     return {"message": "Devolução registrada com sucesso."}
 
@@ -918,8 +1047,7 @@ async def list_users(
             "id": u.id,
             "registration_number": u.registration_number,
             "full_name": u.full_name,
-            "email": u.email,
-            "role": u.role, # Já estava correto de acordo com a nossa última correção
+            "role": u.role,
             "is_active": u.is_active,
         }
         for u in users
@@ -934,16 +1062,12 @@ async def create_user(
 ):
     if db.query(User).filter(User.registration_number == payload.registration_number).first():
         raise HTTPException(status_code=400, detail="Registro já cadastrado.")
-    if payload.email and db.query(User).filter(User.email == payload.email).first():
-        raise HTTPException(status_code=400, detail="E-mail já cadastrado.")
 
-    # Garantindo extração do valor do enum Pydantic
-    role_val = payload.role.value if hasattr(payload.role, 'value') else payload.role
+    role_val = payload.role.value
 
     user = User(
         registration_number=payload.registration_number,
         full_name=payload.full_name,
-        email=payload.email,
         hashed_password=get_password_hash(payload.password),
         role=role_val,
     )
@@ -965,8 +1089,7 @@ async def update_user(
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
     if payload.full_name  is not None: user.full_name  = payload.full_name
-    if payload.email      is not None: user.email      = payload.email
-    if payload.role       is not None: 
+    if payload.role       is not None:
         user.role = payload.role.value if hasattr(payload.role, 'value') else payload.role
     if payload.is_active  is not None: user.is_active  = payload.is_active
     if payload.password:
@@ -1180,7 +1303,7 @@ async def list_all_reservations(
     # Retorna o "bolão" de reservas com todas as relações carregadas para o Frontend filtrar
     return db.query(Reservation).options(
         joinedload(Reservation.slots),
-        joinedload(Reservation.items),
+        joinedload(Reservation.items).joinedload(ReservationItem.model),
         joinedload(Reservation.user),
         joinedload(Reservation.laboratory)
     ).order_by(Reservation.date.desc()).all()

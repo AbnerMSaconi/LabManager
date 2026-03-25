@@ -113,6 +113,14 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
       return [...prev, { item, qty: 1 }];
     });
   };
+  const removeFromCart = (item: ItemModel) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.item.id === item.id);
+      if (!existing) return prev;
+      if (existing.qty <= 1) return prev.filter(i => i.item.id !== item.id);
+      return prev.map(i => i.item.id === item.id ? { ...i, qty: i.qty - 1 } : i);
+    });
+  };
 
   const checkAvailabilityAndProceed = async () => {
     setFetchingAvailability(true);
@@ -582,7 +590,7 @@ export function ReservationWizard({ onComplete, onCancel }: Props) {
                               <div className="flex items-center gap-2">
                                 {inCart ? (
                                   <>
-                                    <button onClick={() => removeFromCart(item.id)}
+                                    <button onClick={() => removeFromCart(item)}
                                       className="w-7 h-7 rounded-lg border border-neutral-200 flex items-center justify-center text-red-500 hover:bg-red-50 font-bold text-lg">-</button>
                                     <span className="w-6 text-center font-bold text-sm">{inCart.qty}</span>
                                     <button onClick={() => addToCart(item)}

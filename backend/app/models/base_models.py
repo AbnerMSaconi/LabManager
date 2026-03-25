@@ -49,13 +49,12 @@ class ItemStatus(enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    id:                  Mapped[int]           = mapped_column(primary_key=True)
-    registration_number: Mapped[str]           = mapped_column(String(50), unique=True, index=True)
-    email:               Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True)
-    hashed_password:     Mapped[str]           = mapped_column(String(255))
-    full_name:           Mapped[str]           = mapped_column(String(255))
-    role:                Mapped[str]           = mapped_column(String(30), default="professor")
-    is_active:           Mapped[bool]          = mapped_column(default=True)
+    id:                  Mapped[int]  = mapped_column(primary_key=True)
+    registration_number: Mapped[str]  = mapped_column(String(50), unique=True, index=True)
+    hashed_password:     Mapped[str]  = mapped_column(String(255))
+    full_name:           Mapped[str]  = mapped_column(String(255))
+    role:                Mapped[str]  = mapped_column(String(30), default="professor")
+    is_active:           Mapped[bool] = mapped_column(default=True)
 
 
 class LessonSlot(Base):
@@ -205,3 +204,20 @@ class MaintenanceTicket(Base):
     physical_item: Mapped[Optional["PhysicalItem"]]= relationship(foreign_keys=[physical_item_id])
     opened_by:     Mapped["User"]                  = relationship(foreign_keys=[opened_by_id])
     resolved_by:   Mapped[Optional["User"]]        = relationship(foreign_keys=[resolved_by_id])
+
+
+class InventoryMovement(Base):
+    __tablename__ = "inventory_movements"
+    id:             Mapped[int]           = mapped_column(primary_key=True)
+    item_model_id:  Mapped[int]           = mapped_column(ForeignKey("item_models.id"))
+    action:         Mapped[str]           = mapped_column(String(50))  # saida, entrada, emprestimo, devolucao
+    quantity:       Mapped[int]           = mapped_column(Integer)
+    operator_id:    Mapped[int]           = mapped_column(ForeignKey("users.id"))
+    target:         Mapped[str]           = mapped_column(String(255))
+    reservation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("reservations.id"), nullable=True)
+    loan_id:        Mapped[Optional[int]] = mapped_column(ForeignKey("institution_loans.id"), nullable=True)
+    observation:    Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at:     Mapped[datetime]      = mapped_column(default=datetime.utcnow)
+
+    model:    Mapped["ItemModel"] = relationship(foreign_keys=[item_model_id])
+    operator: Mapped["User"]      = relationship(foreign_keys=[operator_id])

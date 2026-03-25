@@ -15,6 +15,7 @@ export function LoginPage({ dark, toggleDark }: Props) {
     e.preventDefault();
     setLoading(true);
     try { await login(registration, password); }
+    catch { /* error handled by useAuth */ }
     finally { setLoading(false); }
   };
 
@@ -66,7 +67,7 @@ export function LoginPage({ dark, toggleDark }: Props) {
                 style={{ color: "var(--text-tertiary)" }} />
               <input type="text" required value={registration}
                 onChange={e => setRegistration(e.target.value)}
-                placeholder="RA2024001 ou email@ucdb.br"
+                placeholder="RA2024001 ou RF001"
                 className="w-full rounded-xl py-3 pl-10 pr-4 border text-sm"
                 style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }} />
             </div>

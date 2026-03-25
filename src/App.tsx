@@ -16,6 +16,7 @@ import { LabsPage }          from "./pages/LabsPage";
 import { DailyPage }         from "./pages/DailyPage";
 import { MaintenancePage }   from "./pages/MaintenancePage";
 import { UsersPage }         from "./pages/UsersPage";
+import { MovementsPage }     from "./pages/MovementsPage";
 
 // ── Dark mode hook ────────────────────────────────────────────────────────────
 function useDarkMode() {
@@ -42,6 +43,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: "inventory",    label: "Almoxarifado",     icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR] },
   { id: "labs",         label: "Laboratórios",     icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR] },
   { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
+  { id: "movements",   label: "Movimentações",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
   { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
   { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROGEX, UserRole.ADMINISTRADOR] },
 ];
@@ -464,6 +466,7 @@ function Shell() {
                   {activeTab === "inventory"    && <InventoryPage />}
                   {activeTab === "labs"         && <LabsPage />}
                   {activeTab === "maintenance"  && <MaintenancePage />}
+                  {activeTab === "movements"   && <MovementsPage />}
                   {activeTab === "users"        && <UsersPage />}
                   {activeTab === "settings"     && (
                     <div className="py-20 text-center" style={{ color: "var(--text-tertiary)" }}>

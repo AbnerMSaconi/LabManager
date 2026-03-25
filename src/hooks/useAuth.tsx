@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { User } from "../types";
+import { User, UserRole } from "../types";
 import { login as apiLogin, getMe } from "../api/authApi";
 import { ApiError } from "../api/client";
 
@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (registrationOrEmail: string, password: string) => Promise<void>;
+  login: (registration: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -31,18 +31,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(async (registrationOrEmail: string, password: string) => {
+  const login = useCallback(async (registration: string, password: string) => {
     setError(null);
     try {
-      const res = await apiLogin(registrationOrEmail, password);
+      const res = await apiLogin(registration, password);
       localStorage.setItem("access_token", res.access_token);
-      // Monta User a partir da resposta do login
       setUser({
         id: res.user.id,
-        registration_number: res.user.registration_number ?? registrationOrEmail,
+        registration_number: res.user.registration_number ?? registration,
         full_name: res.user.full_name ?? "Usuário",
-        role: res.user.role as any,
-        email: res.user.email,
+        role: res.user.role as UserRole,
       });
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);

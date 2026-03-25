@@ -3,7 +3,7 @@ import {
   Search, Plus, QrCode, Edit2, Package, CheckCircle2,
   Calendar, Building2, AlertTriangle,
 } from "lucide-react";
-import { UserRole, ItemCategory, ItemModel, Reservation, InstitutionLoan, AvailableItemModel } from "../types";
+import { UserRole, ItemCategory, ItemModel, Reservation, InstitutionLoan, AvailableItemModel, StockItem } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import { inventoryApi } from "../api/inventoryApi";
@@ -557,6 +557,116 @@ function LoansTab({ onNewLoan }: { onNewLoan?: () => void }) {
   );
 }
 
+// ── StockTab ──────────────────────────────────────────────────────────────────
+
+function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLoan }: {
+  search: string; setSearch: (v: string) => void;
+  category: string; setCategory: (v: string) => void;
+  onEdit: (item: ItemModel) => void;
+  onQr: (item: ItemModel) => void;
+  onLoan: (item: ItemModel) => void;
+}) {
+  const { data, loading, error, refetch } = useFetch(inventoryApi.listStock);
+
+  const filtered = useMemo(() => (data ?? []).filter((item: StockItem) =>
+    item.name.toLowerCase().includes(search.toLowerCase()) && (category === "all" || item.category === category)
+  ), [data, search, category]);
+
+  return (
+    <>
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+          <input type="text" placeholder="Buscar material..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full bg-white border border-neutral-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm text-sm" />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
+          {["all", ...Object.values(ItemCategory)].map(cat => (
+            <button key={cat} onClick={() => setCategory(cat)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
+                category === cat ? "bg-neutral-900 text-white" : "bg-white text-neutral-500 border border-neutral-200 hover:border-neutral-900"
+              }`}>
+              {cat === "all" ? "Todos" : (CATEGORY_LABELS[cat] ?? cat)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <LoadingSpinner label="Carregando estoque..." />}
+      {error && <ErrorMessage message={error} onRetry={refetch} />}
+      {!loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {filtered.length === 0
+            ? <p className="text-neutral-400 col-span-4 text-center py-12">Nenhum item encontrado.</p>
+            : filtered.map((item: StockItem) => {
+              const pct = item.total_stock > 0 ? (item.available_qty / item.total_stock) * 100 : 100;
+              const barColor = pct > 50 ? "bg-emerald-400" : pct > 20 ? "bg-amber-400" : "bg-red-400";
+              return (
+                <motion.div key={item.id} whileHover={{ y: -3 }}
+                  className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col">
+                  <div className="aspect-square bg-neutral-100 relative">
+                    {item.image_url
+                      ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      : <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-neutral-300">{item.name.charAt(0)}</div>
+                    }
+                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-[10px] font-bold text-neutral-600 shadow-sm">
+                      {CATEGORY_LABELS[item.category] ?? item.category}
+                    </div>
+                  </div>
+                  <div className="p-4 flex-1 flex flex-col">
+                    <h4 className="font-bold text-neutral-900 mb-1">{item.name}</h4>
+                    <p className="text-xs text-neutral-500 line-clamp-2 mb-3">{item.description}</p>
+                    <div className="mt-auto space-y-2">
+                      {/* Availability bar */}
+                      <div>
+                        <div className="flex justify-between text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
+                          <span>Disponível</span>
+                          <span className="text-neutral-700">{item.available_qty} / {item.total_stock}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                      {(item.in_use > 0 || item.in_loans > 0) && (
+                        <div className="flex gap-1 flex-wrap">
+                          {item.in_use > 0 && (
+                            <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md font-bold">
+                              {item.in_use} em uso
+                            </span>
+                          )}
+                          {item.in_loans > 0 && (
+                            <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-md font-bold">
+                              {item.in_loans} emprestado
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-1 pt-1">
+                        <button onClick={() => onEdit(item)}
+                          className="flex items-center justify-center gap-1 p-2 rounded-lg border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 transition-colors">
+                          <Edit2 size={12} /> Editar
+                        </button>
+                        <button onClick={() => onQr(item)}
+                          className="flex items-center justify-center gap-1 p-2 rounded-lg border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 transition-colors">
+                          <QrCode size={12} /> QR
+                        </button>
+                        <button onClick={() => onLoan(item)}
+                          className="flex items-center justify-center gap-1 p-2 rounded-lg border border-blue-100 text-xs text-blue-600 hover:bg-blue-50 transition-colors">
+                          <Package size={12} /> Emprestar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })
+          }
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Main InventoryPage ────────────────────────────────────────────────────────
 
 export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) {
@@ -572,6 +682,8 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
   const [qrItem, setQrItem] = useState<ItemModel | null>(null);
   const [loanItem, setLoanItem] = useState<ItemModel | null>(null);
   const [showRequestWizard, setShowRequestWizard] = useState(false);
+  const [stockKey, setStockKey] = useState(0);
+  const [loansKey, setLoansKey] = useState(0);
 
   const filtered = useMemo(() => (data ?? []).filter(item =>
     item.name.toLowerCase().includes(search.toLowerCase()) && (category === "all" || item.category === category)
@@ -658,7 +770,7 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
         <ItemModelFormModal item={editingItem ?? undefined} onClose={() => { setShowCreate(false); setEditingItem(null); }} onSaved={refetch} />
       )}
       {qrItem && <QRCodeModal item={qrItem} onClose={() => setQrItem(null)} />}
-      {loanItem && <InstitutionLoanModal item={loanItem} onClose={() => setLoanItem(null)} onSaved={refetch} />}
+      {loanItem && <InstitutionLoanModal item={loanItem} onClose={() => setLoanItem(null)} onSaved={() => { refetch(); setStockKey(k => k + 1); setLoansKey(k => k + 1); }} />}
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -685,58 +797,16 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
       </div>
 
       {dtiTab === "stock" && (
-        <>
-          <SearchBar />
-          {loading && <LoadingSpinner label="Carregando inventário..." />}
-          {error && <ErrorMessage message={error} onRetry={refetch} />}
-          {!loading && !error && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filtered.length === 0
-                ? <p className="text-neutral-400 col-span-4 text-center py-12">Nenhum item encontrado.</p>
-                : filtered.map(item => (
-                  <motion.div key={item.id} whileHover={{ y: -3 }}
-                    className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col">
-                    <div className="aspect-square bg-neutral-100 relative">
-                      {item.image_url
-                        ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        : <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-neutral-300">{item.name.charAt(0)}</div>
-                      }
-                      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-[10px] font-bold text-neutral-600 shadow-sm">
-                        {CATEGORY_LABELS[item.category] ?? item.category}
-                      </div>
-                    </div>
-                    <div className="p-4 flex-1 flex flex-col">
-                      <h4 className="font-bold text-neutral-900 mb-1">{item.name}</h4>
-                      <p className="text-xs text-neutral-500 line-clamp-2 mb-3">{item.description}</p>
-                      <div className="mt-auto">
-                        <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Estoque Total</p>
-                        <p className="text-sm font-bold text-neutral-900 mb-3">{item.total_stock} unidades</p>
-                        <div className="grid grid-cols-3 gap-1">
-                          <button onClick={() => setEditingItem(item)}
-                            className="flex items-center justify-center gap-1 p-2 rounded-lg border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 transition-colors">
-                            <Edit2 size={12} /> Editar
-                          </button>
-                          <button onClick={() => setQrItem(item)}
-                            className="flex items-center justify-center gap-1 p-2 rounded-lg border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 transition-colors">
-                            <QrCode size={12} /> QR Code
-                          </button>
-                          <button onClick={() => setLoanItem(item)}
-                            className="flex items-center justify-center gap-1 p-2 rounded-lg border border-blue-100 text-xs text-blue-600 hover:bg-blue-50 transition-colors">
-                            <Package size={12} /> Emprestar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
-              }
-            </div>
-          )}
-        </>
+        <StockTab
+          key={stockKey}
+          search={search} setSearch={setSearch}
+          category={category} setCategory={setCategory}
+          onEdit={setEditingItem} onQr={setQrItem} onLoan={setLoanItem}
+        />
       )}
 
       {dtiTab === "pending" && <PendingRequestsTab />}
-      {dtiTab === "loans" && <LoansTab />}
+      {dtiTab === "loans" && <LoansTab key={loansKey} />}
     </div>
   );
 }

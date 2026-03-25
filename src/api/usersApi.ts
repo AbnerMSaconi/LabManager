@@ -5,7 +5,6 @@ export interface UserFull {
   id: number;
   registration_number: string;
   full_name: string;
-  email?: string;
   role: UserRole;
   is_active: boolean;
 }
@@ -13,14 +12,12 @@ export interface UserFull {
 export interface CreateUserPayload {
   registration_number: string;
   full_name: string;
-  email?: string;
   password: string;
   role: UserRole;
 }
 
 export interface UpdateUserPayload {
   full_name?: string;
-  email?: string;
   role?: UserRole;
   is_active?: boolean;
   password?: string;

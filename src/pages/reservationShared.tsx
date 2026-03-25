@@ -1,13 +1,13 @@
 /**
  * Shared constants, types and components used across reservation pages.
  */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  Monitor, CalendarDays, Building2, Layers, ChevronLeft,
-  Info, XCircle, Edit, Trash2, X,
+  Monitor, CalendarDays, Building2, Layers, ChevronLeft, ChevronDown,
+  Info, XCircle, Edit, Trash2, X, Package,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { ReservationStatus, Reservation, Laboratory } from "../types";
+import { ReservationStatus, Reservation, Laboratory, ReservationItem } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
 import { labsApi } from "../api/labsApi";
@@ -48,6 +48,95 @@ export function StatusBadge({ status }: { status: string }) {
     <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${STATUS_STYLES[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}>
       {status.replace(/_/g, " ")}
     </span>
+  );
+}
+
+// ─── SoftwareBadge ───────────────────────────────────────────────────────────
+
+export function SoftwareBadge({ softwares, label = "Software" }: { softwares: string; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const list = softwares.split(",").map(s => s.trim()).filter(Boolean);
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        className="flex items-center gap-0.5 text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
+      >
+        {label} <ChevronDown size={9} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+          <div className="bg-purple-50 border-b border-purple-100 px-3 py-2 text-[10px] font-bold text-purple-700 uppercase tracking-widest">
+            Softwares ({list.length})
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
+            {list.map((sw, i) => (
+              <div key={i} className="px-3 py-2 text-xs font-medium text-neutral-700 flex items-center gap-2 hover:bg-neutral-50">
+                <Monitor size={11} className="text-purple-400 flex-shrink-0" />
+                {sw}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MaterialsBadge ──────────────────────────────────────────────────────────
+
+export function MaterialsBadge({ items }: { items: ReservationItem[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        className="flex items-center gap-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+      >
+        Materiais <ChevronDown size={9} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden min-w-[180px]">
+          <div className="bg-amber-50 border-b border-amber-100 px-3 py-2 text-[10px] font-bold text-amber-700 uppercase tracking-widest">
+            Materiais ({items.length})
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
+            {items.map(item => (
+              <div key={item.id} className="px-3 py-2 text-xs font-medium text-neutral-700 flex items-center justify-between gap-3 hover:bg-neutral-50">
+                <span className="flex items-center gap-2">
+                  <Package size={11} className="text-amber-400 flex-shrink-0" />
+                  {item.model?.name ?? `Item #${item.item_model_id}`}
+                </span>
+                <span className="text-neutral-400 font-bold">x{item.quantity_requested}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

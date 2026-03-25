@@ -59,7 +59,6 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
   const [form, setForm] = useState({
     registration_number: initial?.registration_number ?? "",
     full_name: initial?.full_name ?? "",
-    email: initial?.email ?? "",
     role: initial?.role ?? UserRole.PROFESSOR,
     password: "",
   });
@@ -73,7 +72,6 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
     try {
       const payload: any = {
         full_name: form.full_name,
-        email: form.email || undefined,
         role: form.role,
       };
       if (!isEdit) {
@@ -102,12 +100,6 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Nome completo</label>
         <input required value={form.full_name} onChange={e => set("full_name", e.target.value)}
           className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-neutral-900 outline-none text-sm" />
-      </div>
-      <div>
-        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">E-mail (opcional)</label>
-        <input type="email" value={form.email} onChange={e => set("email", e.target.value)}
-          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-neutral-900 outline-none text-sm"
-          placeholder="usuario@universidade.edu" />
       </div>
       <div>
         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Papel / Permissões</label>
@@ -160,7 +152,7 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<UserFull | null>(null);
   const [showPermissions, setShowPermissions] = useState(false);
 
-  const canManage = me?.role === UserRole.PROGEX || me?.role === UserRole.DTI_TECNICO;
+  const canManage = me?.role === UserRole.PROGEX || me?.role === UserRole.DTI_TECNICO || me?.role === UserRole.ADMINISTRADOR;
   const canDeactivate = me?.role === UserRole.PROGEX;
 
   const handleCreate = async (payload: any) => {
@@ -274,7 +266,7 @@ export function UsersPage() {
                       </div>
                       <div>
                         <p className="font-bold text-sm">{u.full_name}</p>
-                        <p className="text-xs text-neutral-400">{u.email ?? "—"}</p>
+                        <p className="text-xs text-neutral-400 font-mono">{u.registration_number}</p>
                       </div>
                     </div>
                   </td>

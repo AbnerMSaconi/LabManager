@@ -42,7 +42,6 @@ export interface User {
   registration_number: string;
   full_name: string;
   role: UserRole;
-  email?: string;
 }
 
 export interface Laboratory {
@@ -101,6 +100,9 @@ export interface ReservationItem {
   reservation_id: number;
   item_model_id: number;
   quantity_requested: number;
+  quantity_returned?: number;
+  return_status?: ItemStatus | string;
+  damage_observation?: string;
   model?: ItemModel;
 }
 
@@ -122,4 +124,25 @@ export interface InstitutionLoan {
   created_at: string;
   returned_at?: string;
   model?: ItemModel;
+}
+
+export interface StockItem extends ItemModel {
+  in_use: number;
+  in_loans: number;
+  available_qty: number;
+}
+
+export interface InventoryMovement {
+  id: number;
+  item_model_id: number;
+  action: "saida" | "entrada" | "emprestimo" | "devolucao";
+  quantity: number;
+  operator_id: number;
+  target: string;
+  reservation_id?: number;
+  loan_id?: number;
+  observation?: string;
+  created_at: string;
+  model?: { id: number; name: string; category: string };
+  operator?: { id: number; full_name: string; role: string };
 }

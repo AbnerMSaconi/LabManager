@@ -1,5 +1,5 @@
 import { api } from "./client";
-import { ItemModel, AvailableItemModel, InstitutionLoan, Reservation } from "../types";
+import { ItemModel, AvailableItemModel, InstitutionLoan, Reservation, StockItem, InventoryMovement } from "../types";
 
 export interface CheckoutPayload {
   reservation_id: number;
@@ -56,6 +56,8 @@ export const inventoryApi = {
   createLoan:              (p: LoanCreatePayload)           => api.post<{ message: string; id: number }>("/api/v1/logistics/loans", p),
   listLoans:               ()                               => api.get<InstitutionLoan[]>("/api/v1/logistics/loans"),
   returnLoan:              (id: number, p: LoanReturnPayload) => api.patch<{ message: string }>(`/api/v1/logistics/loans/${id}/return`, p),
-  checkout: (payload: CheckoutPayload) => api.post<{ message: string }>("/api/v1/logistics/checkout", payload),
-  checkin:  (payload: CheckinPayload)  => api.post<{ message: string }>("/api/v1/logistics/checkin", payload),
+  checkout:       (payload: CheckoutPayload) => api.post<{ message: string }>("/api/v1/logistics/checkout", payload),
+  checkin:        (payload: CheckinPayload)  => api.post<{ message: string }>("/api/v1/logistics/checkin", payload),
+  listStock:      ()                         => api.get<StockItem[]>("/api/v1/inventory/stock"),
+  listMovements:  ()                         => api.get<InventoryMovement[]>("/api/v1/inventory/movements"),
 };
