@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from typing import List, Optional
 import uuid
 from pydantic import BaseModel
@@ -640,6 +641,253 @@ async def list_item_models(
     current_user: User = Depends(get_current_user)
 ):
     return db.query(ItemModel).all()
+
+
+@app.get("/api/v1/inventory/models/available", tags=["inventário"])
+async def list_available_models(
+    date: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from datetime import datetime as _dt
+    try:
+        target_date = _dt.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data inválida. Use YYYY-MM-DD.")
+
+    active_statuses = [
+        ReservationStatus.PENDENTE.value, ReservationStatus.APROVADO.value,
+        ReservationStatus.AGUARDANDO_SOFTWARE.value, ReservationStatus.EM_USO.value,
+        ReservationStatus.APROVADO_COM_RESSALVAS.value,
+    ]
+    reserved_rows = db.query(
+        ReservationItem.item_model_id,
+        func.sum(ReservationItem.quantity_requested).label("total_reserved"),
+    ).join(Reservation).filter(
+        Reservation.date == target_date,
+        Reservation.status.in_(active_statuses),
+    ).group_by(ReservationItem.item_model_id).all()
+
+    reserved_map = {row.item_model_id: row.total_reserved for row in reserved_rows}
+    models = db.query(ItemModel).all()
+    return [
+        {
+            "id": m.id, "name": m.name, "category": m.category,
+            "description": m.description, "image_url": m.image_url,
+            "total_stock": m.total_stock,
+            "available_qty": max(0, m.total_stock - reserved_map.get(m.id, 0)),
+        }
+        for m in models
+    ]
+
+
+from .schemas.reservation_schemas import ItemModelCreate, ItemModelUpdate, AddReservationItemsRequest, InstitutionLoanCreate, InstitutionLoanReturn
+from .models.base_models import InstitutionLoan
+
+
+@app.post("/api/v1/inventory/item-models", status_code=status.HTTP_201_CREATED, tags=["inventário"])
+async def create_item_model(
+    payload: ItemModelCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    cat_val = payload.category.value if hasattr(payload.category, "value") else payload.category
+    model = ItemModel(
+        name=payload.name, category=cat_val, description=payload.description,
+        image_url=payload.image_url, total_stock=payload.total_stock,
+    )
+    db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
+
+
+@app.patch("/api/v1/inventory/item-models/{model_id}", tags=["inventário"])
+async def update_item_model(
+    model_id: int,
+    payload: ItemModelUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    model = db.query(ItemModel).filter(ItemModel.id == model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Modelo não encontrado.")
+    if payload.name        is not None: model.name        = payload.name
+    if payload.category    is not None: model.category    = payload.category.value if hasattr(payload.category, "value") else payload.category
+    if payload.description is not None: model.description = payload.description
+    if payload.image_url   is not None: model.image_url   = payload.image_url
+    if payload.total_stock is not None: model.total_stock = payload.total_stock
+    db.commit()
+    return model
+
+
+@app.get("/api/v1/reservations/my/practical", tags=["reservas"])
+async def list_my_practical_reservations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.PROFESSOR])),
+):
+    active_statuses = [
+        ReservationStatus.PENDENTE.value, ReservationStatus.APROVADO.value,
+        ReservationStatus.AGUARDANDO_SOFTWARE.value, ReservationStatus.APROVADO_COM_RESSALVAS.value,
+    ]
+    from .models.base_models import Laboratory as Lab
+    return db.query(Reservation).join(Lab, Reservation.lab_id == Lab.id).options(
+        joinedload(Reservation.slots),
+        joinedload(Reservation.items),
+        joinedload(Reservation.laboratory),
+        joinedload(Reservation.user),
+    ).filter(
+        Reservation.user_id == current_user.id,
+        Reservation.status.in_(active_statuses),
+        Lab.block == "Bloco C",
+    ).order_by(Reservation.date).all()
+
+
+@app.post("/api/v1/reservations/{reservation_id}/add-items", tags=["reservas"])
+async def add_items_to_reservation(
+    reservation_id: int,
+    payload: AddReservationItemsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    reservation = db.query(Reservation).filter(
+        Reservation.id == reservation_id,
+        Reservation.user_id == current_user.id,
+    ).first()
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reserva não encontrada.")
+    if reservation.status in [ReservationStatus.REJEITADO.value, ReservationStatus.CANCELADO.value, ReservationStatus.CONCLUIDO.value]:
+        raise HTTPException(status_code=400, detail="Esta reserva não aceita mais materiais.")
+
+    active_statuses = [
+        ReservationStatus.PENDENTE.value, ReservationStatus.APROVADO.value,
+        ReservationStatus.AGUARDANDO_SOFTWARE.value, ReservationStatus.EM_USO.value,
+        ReservationStatus.APROVADO_COM_RESSALVAS.value,
+    ]
+    for item_in in payload.items:
+        model = db.query(ItemModel).filter(ItemModel.id == item_in.item_model_id).first()
+        if not model:
+            raise HTTPException(status_code=404, detail=f"Item {item_in.item_model_id} não encontrado.")
+        reserved = db.query(func.sum(ReservationItem.quantity_requested)).join(Reservation).filter(
+            ReservationItem.item_model_id == item_in.item_model_id,
+            Reservation.date == reservation.date,
+            Reservation.status.in_(active_statuses),
+            Reservation.id != reservation_id,
+        ).scalar() or 0
+        available = model.total_stock - reserved
+        if item_in.quantity_requested > available:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Quantidade insuficiente de '{model.name}'. Disponível: {available}",
+            )
+        existing = db.query(ReservationItem).filter(
+            ReservationItem.reservation_id == reservation_id,
+            ReservationItem.item_model_id == item_in.item_model_id,
+        ).first()
+        if existing:
+            existing.quantity_requested = item_in.quantity_requested
+        else:
+            db.add(ReservationItem(
+                reservation_id=reservation_id,
+                item_model_id=item_in.item_model_id,
+                quantity_requested=item_in.quantity_requested,
+            ))
+    db.commit()
+    return {"message": "Materiais adicionados à reserva com sucesso."}
+
+
+@app.get("/api/v1/inventory/pending-requests", tags=["inventário"])
+async def list_pending_material_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    approved_statuses = [ReservationStatus.APROVADO.value, ReservationStatus.APROVADO_COM_RESSALVAS.value]
+    reservations = db.query(Reservation).options(
+        joinedload(Reservation.items).joinedload(ReservationItem.model),
+        joinedload(Reservation.user),
+        joinedload(Reservation.laboratory),
+        joinedload(Reservation.slots),
+    ).filter(
+        Reservation.status.in_(approved_statuses),
+        Reservation.items.any(),
+    ).order_by(Reservation.date).all()
+    return reservations
+
+
+@app.post("/api/v1/logistics/loans", status_code=status.HTTP_201_CREATED, tags=["logística"])
+async def create_institution_loan(
+    payload: InstitutionLoanCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    model = db.query(ItemModel).filter(ItemModel.id == payload.item_model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Item não encontrado.")
+    loan = InstitutionLoan(
+        item_model_id=payload.item_model_id,
+        requester_name=payload.requester_name,
+        quantity_delivered=payload.quantity_delivered,
+        return_date=payload.return_date,
+        no_return_reason=payload.no_return_reason,
+        created_by_id=current_user.id,
+    )
+    db.add(loan)
+    db.commit()
+    db.refresh(loan)
+    return {"message": "Empréstimo registrado.", "id": loan.id}
+
+
+@app.get("/api/v1/logistics/loans", tags=["logística"])
+async def list_institution_loans(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    loans = db.query(InstitutionLoan).options(
+        joinedload(InstitutionLoan.model),
+    ).order_by(InstitutionLoan.created_at.desc()).all()
+    return [
+        {
+            "id": l.id,
+            "item_model_id": l.item_model_id,
+            "requester_name": l.requester_name,
+            "quantity_delivered": l.quantity_delivered,
+            "quantity_returned": l.quantity_returned,
+            "return_date": str(l.return_date) if l.return_date else None,
+            "no_return_reason": l.no_return_reason,
+            "status": l.status,
+            "damage_observation": l.damage_observation,
+            "is_operational": l.is_operational,
+            "created_at": l.created_at.isoformat(),
+            "returned_at": l.returned_at.isoformat() if l.returned_at else None,
+            "model": {"id": l.model.id, "name": l.model.name, "category": l.model.category} if l.model else None,
+        }
+        for l in loans
+    ]
+
+
+@app.patch("/api/v1/logistics/loans/{loan_id}/return", tags=["logística"])
+async def return_institution_loan(
+    loan_id: int,
+    payload: InstitutionLoanReturn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR])),
+):
+    from datetime import datetime as _dt
+    loan = db.query(InstitutionLoan).filter(InstitutionLoan.id == loan_id).first()
+    if not loan:
+        raise HTTPException(status_code=404, detail="Empréstimo não encontrado.")
+    if loan.status != "em_aberto":
+        raise HTTPException(status_code=400, detail="Este empréstimo já foi encerrado.")
+    if payload.has_damage and not payload.damage_observation:
+        raise HTTPException(status_code=400, detail="Descreva a avaria ocorrida.")
+
+    loan.quantity_returned = payload.quantity_returned if not payload.all_returned else loan.quantity_delivered
+    loan.damage_observation = payload.damage_observation if payload.has_damage else None
+    loan.is_operational = payload.is_operational if payload.has_damage else None
+    loan.returned_at = _dt.utcnow()
+    loan.status = "devolvido_com_avaria" if payload.has_damage else "devolvido"
+    db.commit()
+    return {"message": "Devolução registrada com sucesso."}
 
 
 # ------------------------------------------------------------------

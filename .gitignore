@@ -30,3 +30,6 @@ Thumbs.db
 
 # Alembic (não versionar banco local)
 alembic/versions/__pycache__/
+
+.claude/
+.claude-flow/

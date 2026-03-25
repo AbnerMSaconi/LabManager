@@ -163,3 +163,41 @@ class LaboratoryUpdate(BaseModel):
 class SoftwareCreate(BaseModel):
     name: str
     version: Optional[str] = None
+
+
+# --- SCHEMAS DE INVENTÁRIO ---
+
+class ItemModelCreate(BaseModel):
+    name: str
+    category: ItemCategory
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    total_stock: int = Field(ge=0, default=0)
+
+
+class ItemModelUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[ItemCategory] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    total_stock: Optional[int] = Field(ge=0, default=None)
+
+
+class AddReservationItemsRequest(BaseModel):
+    items: List[ReservationItemBase] = Field(..., min_length=1)
+
+
+class InstitutionLoanCreate(BaseModel):
+    item_model_id: int
+    requester_name: str
+    quantity_delivered: int = Field(gt=0)
+    return_date: Optional[date] = None
+    no_return_reason: Optional[str] = None
+
+
+class InstitutionLoanReturn(BaseModel):
+    all_returned: bool
+    quantity_returned: int = Field(ge=0)
+    has_damage: bool = False
+    is_operational: Optional[bool] = None
+    damage_observation: Optional[str] = None

@@ -103,3 +103,23 @@ export interface ReservationItem {
   quantity_requested: number;
   model?: ItemModel;
 }
+
+export interface AvailableItemModel extends ItemModel {
+  available_qty: number;
+}
+
+export interface InstitutionLoan {
+  id: number;
+  item_model_id: number;
+  requester_name: string;
+  quantity_delivered: number;
+  quantity_returned: number;
+  return_date?: string;
+  no_return_reason?: string;
+  status: "em_aberto" | "devolvido" | "devolvido_com_avaria";
+  damage_observation?: string;
+  is_operational?: boolean;
+  created_at: string;
+  returned_at?: string;
+  model?: ItemModel;
+}

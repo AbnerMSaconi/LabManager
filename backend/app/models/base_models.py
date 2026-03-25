@@ -164,7 +164,27 @@ class ReservationItem(Base):
     quantity_returned:  Mapped[int]           = mapped_column(Integer, default=0)
     return_status:      Mapped[Optional[str]] = mapped_column(String(30))
     damage_observation: Mapped[Optional[str]] = mapped_column(Text)
-    reservation: Mapped["Reservation"] = relationship(back_populates="items")
+    reservation: Mapped["Reservation"]        = relationship(back_populates="items")
+    model:       Mapped[Optional["ItemModel"]]= relationship(foreign_keys=[item_model_id], viewonly=True)
+
+
+class InstitutionLoan(Base):
+    __tablename__ = "institution_loans"
+    id:                 Mapped[int]            = mapped_column(primary_key=True)
+    item_model_id:      Mapped[int]            = mapped_column(ForeignKey("item_models.id"))
+    requester_name:     Mapped[str]            = mapped_column(String(255))
+    quantity_delivered: Mapped[int]            = mapped_column(Integer)
+    quantity_returned:  Mapped[int]            = mapped_column(Integer, default=0)
+    return_date:        Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    no_return_reason:   Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    status:             Mapped[str]            = mapped_column(String(30), default="em_aberto")
+    damage_observation: Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    is_operational:     Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    created_by_id:      Mapped[int]            = mapped_column(ForeignKey("users.id"))
+    created_at:         Mapped[datetime]       = mapped_column(default=datetime.utcnow)
+    returned_at:        Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    model:       Mapped["ItemModel"] = relationship(foreign_keys=[item_model_id])
+    created_by:  Mapped["User"]     = relationship(foreign_keys=[created_by_id])
 
 
 class MaintenanceTicket(Base):
