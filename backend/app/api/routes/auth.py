@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from ...api.deps import get_db
+from ...api.deps import get_db, get_current_user
 from ...core import security
 from ...models.base_models import User
 
@@ -39,4 +39,14 @@ async def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestF
             "full_name": user.full_name,
             "role": user.role,
         },
+    }
+
+
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "registration_number": current_user.registration_number,
+        "full_name": current_user.full_name,
+        "role": current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
     }

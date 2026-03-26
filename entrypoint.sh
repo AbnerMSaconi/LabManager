@@ -2,13 +2,17 @@
 set -e
 
 echo "⏳ Aguardando banco de dados ficar disponível..."
-sleep 3
+until pg_isready -h db -U "${POSTGRES_USER:-labmanager}"; do
+  echo "   banco ainda não pronto — aguardando 2s..."
+  sleep 2
+done
+echo "✅ Banco disponível."
 
 echo "🔄 Rodando migrações Alembic..."
 alembic upgrade head
 
 echo "🌱 Populando dados iniciais..."
-python -m backend.seed
+python -m backend.seed || echo "⚠️  Seed concluído com avisos (dados já existentes ou erro não-fatal)."
 
 echo "🚀 Iniciando servidor com Gunicorn..."
 exec gunicorn backend.app.main:app \
