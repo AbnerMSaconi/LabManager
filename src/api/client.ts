@@ -38,7 +38,12 @@ async function request<T>(
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { 
+    ...options, 
+    headers,
+    cache: "no-store" 
+  });
+  // const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   if (res.status === 401) {
     try { localStorage.removeItem("access_token"); } catch {}

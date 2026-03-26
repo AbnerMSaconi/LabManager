@@ -17,7 +17,8 @@ import { DailyPage }         from "./pages/DailyPage";
 import { MaintenancePage }   from "./pages/MaintenancePage";
 import { UsersPage }         from "./pages/UsersPage";
 import { MovementsPage }     from "./pages/MovementsPage";
-import { SSEListener } from './components/SSEListener'; // 🔹 Adicione este import
+import { SSEListener } from './components/SSEListener';
+import { SettingsPage } from "./pages/SettingsPage";
 
 // ── Dark mode hook ────────────────────────────────────────────────────────────
 function useDarkMode() {
@@ -46,7 +47,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
   { id: "movements",   label: "Movimentações",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
   { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
-  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROGEX, UserRole.ADMINISTRADOR] },
+  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -469,12 +470,7 @@ function Shell() {
                   {activeTab === "maintenance"  && <MaintenancePage />}
                   {activeTab === "movements"   && <MovementsPage />}
                   {activeTab === "users"        && <UsersPage />}
-                  {activeTab === "settings"     && (
-                    <div className="py-20 text-center" style={{ color: "var(--text-tertiary)" }}>
-                      <Settings size={48} className="mx-auto mb-4 opacity-30" />
-                      <p>Configurações — em desenvolvimento</p>
-                    </div>
-                  )}
+                  {activeTab === "settings"     && <SettingsPage />}
                 </motion.div>
               )}
             </AnimatePresence>

@@ -44,7 +44,10 @@ export function useFetch<T>(
   useEffect(() => {
     if (!listenToSSE) return;
 
-    const handleSseUpdate = () => refetch();
+    const handleSseUpdate = () => {
+      console.log("🔥 SINAL RECEBIDO! Recarregando a tabela pela API...");
+      refetch();
+    };
 
     window.addEventListener("sse-update", handleSseUpdate);
     return () => window.removeEventListener("sse-update", handleSseUpdate);
