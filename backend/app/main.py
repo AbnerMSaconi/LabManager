@@ -1,7 +1,13 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.routes import auth, health, users, maintenance, reservations, logistics, labs, inventory
+from .api.routes import auth, health, users, maintenance, reservations, logistics, labs, inventory, sse
+
+ALLOWED_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,http://localhost"
+).split(",")
 
 app = FastAPI(
     title="LabManager Pro API",
@@ -11,7 +17,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,3 +31,4 @@ app.include_router(reservations.router)
 app.include_router(logistics.router)
 app.include_router(labs.router)
 app.include_router(inventory.router)
+app.include_router(sse.router)

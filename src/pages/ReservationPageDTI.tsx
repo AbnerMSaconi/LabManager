@@ -397,7 +397,7 @@ export function ReservationPageDTI() {
   const canApprove = user?.role === UserRole.DTI_TECNICO;
 
   const { showToast, ToastComponent } = useToast();
-  const { data, loading, error, refetch } = useFetch(reservationsApi.listAll);
+  const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
 
   const [filter, setFilter]             = useState<string>(ReservationStatus.PENDENTE);
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");

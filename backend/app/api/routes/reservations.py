@@ -6,6 +6,7 @@ import uuid
 from pydantic import BaseModel
 
 from ..deps import get_db, RoleChecker, get_current_user
+from .sse import broadcast
 from ...models.base_models import (
     Reservation, ReservationItem, ReservationSlot,
     ReservationStatus, User, UserRole, ItemModel, Laboratory
@@ -122,6 +123,7 @@ async def create_reservation(
         created_ids.append(new_reservation.id)
 
     db.commit()
+    await broadcast("RESERVATION_CREATED", {"ids": created_ids, "group_id": group_id, "lab_id": reservation_in.lab_id})
     return {
         "message": f"{len(created_ids)} reserva(s) enviada(s) com sucesso.",
         "group_id": group_id,
@@ -317,6 +319,7 @@ async def review_reservation(
         reservation.approval_notes = review.approval_notes
 
     db.commit()
+    await broadcast("RESERVATION_UPDATED", {"id": reservation_id, "status": review.status.value})
     return {"message": f"Reserva {reservation_id} atualizada para '{review.status.value}'."}
 
 
@@ -379,6 +382,7 @@ async def review_reservation_group(
             updated_count += 1
 
     db.commit()
+    await broadcast("RESERVATION_UPDATED", {"group_id": group_id, "status": review.status.value, "count": updated_count})
     return {"message": f"{updated_count} reservas do lote atualizadas para '{review.status.value}'."}
 
 
@@ -423,6 +427,7 @@ async def swap_reservation_group(
         count += 1
 
     db.commit()
+    await broadcast("RESERVATION_UPDATED", {"group_id": group_id, "action": "swap", "count": count})
     return {"message": f"{count} reservas futuras deste semestre foram transferidas com sucesso."}
 
 
@@ -476,4 +481,5 @@ async def add_items_to_reservation(
                 quantity_requested=item_in.quantity_requested,
             ))
     db.commit()
+    await broadcast("RESERVATION_UPDATED", {"id": reservation_id, "action": "items_added"})
     return {"message": "Materiais adicionados à reserva com sucesso."}

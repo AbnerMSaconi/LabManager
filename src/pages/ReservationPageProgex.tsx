@@ -192,7 +192,7 @@ function GroupRow({
 
 export function ReservationPageProgex({ onNewReservation }: { onNewReservation: () => void }) {
   const { showToast, ToastComponent } = useToast();
-  const { data, loading, error, refetch } = useFetch(reservationsApi.listAll);
+  const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
 
   const [filter, setFilter]             = useState<string>("all");
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");

@@ -284,9 +284,9 @@ function LabCard({
 
 export function LabsPage() {
   const { user } = useAuth();
-  const { data: labs,      loading, error, refetch }  = useFetch(labsApi.list);
+  const { data: labs,      loading, error, refetch }  = useFetch(labsApi.list, [], true);
   const { data: softwares, refetch: refetchSW }        = useFetch(labsApi.listSoftwares);
-  const { data: todayReservations } = useFetch(reservationsApi.listToday);
+  const { data: todayReservations } = useFetch(reservationsApi.listToday, [], true);
   const { showToast, ToastComponent } = useToast();
 
   const [showForm, setShowForm]     = useState(false);

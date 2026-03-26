@@ -160,7 +160,7 @@ function NewTicketModal({ labs, onSave, onClose }: NewTicketModalProps) {
 
 export function MaintenancePage() {
   const { user } = useAuth();
-  const { data, loading, error, refetch } = useFetch(maintenanceApi.list);
+  const { data, loading, error, refetch } = useFetch(maintenanceApi.list, [], true);
   const { data: labs } = useFetch(labsApi.list);
   const { showToast, ToastComponent } = useToast();
   const [resolveTarget, setResolveTarget] = useState<Ticket | null>(null);

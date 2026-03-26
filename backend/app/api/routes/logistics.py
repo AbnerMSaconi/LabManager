@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, RoleChecker
+from .sse import broadcast
 from ...models.base_models import (
     Reservation, ReservationItem, ReservationStatus,
     User, UserRole, PhysicalItem, ItemStatus, ItemModel,
@@ -59,6 +60,7 @@ async def checkout_items(
 
     reservation.status = ReservationStatus.EM_USO.value
     db.commit()
+    await broadcast("CHECKOUT", {"reservation_id": request.reservation_id})
     return {"message": "Checkout realizado com sucesso."}
 
 
@@ -108,6 +110,7 @@ async def checkin_items(
 
     reservation.status = ReservationStatus.CONCLUIDO.value
     db.commit()
+    await broadcast("CHECKIN", {"reservation_id": request.reservation_id})
     return {"message": "Devolução registrada e inventário atualizado."}
 
 
@@ -140,6 +143,7 @@ async def create_institution_loan(
     ))
     db.commit()
     db.refresh(loan)
+    await broadcast("LOAN_CREATED", {"id": loan.id, "item_model_id": payload.item_model_id})
     return {"message": "Empréstimo registrado.", "id": loan.id}
 
 
@@ -205,4 +209,5 @@ async def return_institution_loan(
         observation=obs,
     ))
     db.commit()
+    await broadcast("LOAN_RETURNED", {"loan_id": loan_id})
     return {"message": "Devolução registrada com sucesso."}

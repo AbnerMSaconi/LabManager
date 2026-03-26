@@ -291,7 +291,7 @@ function LoanReturnModal({ loan, onClose, onSaved }: {
 
 function MaterialRequestWizard({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { showToast, ToastComponent } = useToast();
-  const { data: reservations, loading } = useFetch(inventoryApi.myPracticalReservations);
+  const { data: reservations, loading } = useFetch(inventoryApi.myPracticalReservations, [], true);
   const [step, setStep] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<Reservation | null>(null);
   const [availableItems, setAvailableItems] = useState<AvailableItemModel[]>([]);
@@ -445,7 +445,7 @@ function MaterialRequestWizard({ onClose, onDone }: { onClose: () => void; onDon
 // ── PendingRequestsTab ────────────────────────────────────────────────────────
 
 function PendingRequestsTab() {
-  const { data: pending, loading, error, refetch } = useFetch(inventoryApi.pendingRequests);
+  const { data: pending, loading, error, refetch } = useFetch(inventoryApi.pendingRequests, [], true);
 
   if (loading) return <LoadingSpinner label="Carregando solicitações..." />;
   if (error) return <ErrorMessage message={error} onRetry={refetch} />;
@@ -492,7 +492,7 @@ function PendingRequestsTab() {
 // ── LoansTab ──────────────────────────────────────────────────────────────────
 
 function LoansTab({ onNewLoan }: { onNewLoan?: () => void }) {
-  const { data: loans, loading, error, refetch } = useFetch(inventoryApi.listLoans);
+  const { data: loans, loading, error, refetch } = useFetch(inventoryApi.listLoans, [], true);
   const [returning, setReturning] = useState<InstitutionLoan | null>(null);
 
   const STATUS_STYLES: Record<string, string> = {
@@ -566,7 +566,7 @@ function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLo
   onQr: (item: ItemModel) => void;
   onLoan: (item: ItemModel) => void;
 }) {
-  const { data, loading, error, refetch } = useFetch(inventoryApi.listStock);
+  const { data, loading, error, refetch } = useFetch(inventoryApi.listStock, [], true);
 
   const filtered = useMemo(() => (data ?? []).filter((item: StockItem) =>
     item.name.toLowerCase().includes(search.toLowerCase()) && (category === "all" || item.category === category)
@@ -673,7 +673,7 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
   const { user } = useAuth();
   const isProfessor = user?.role === UserRole.PROFESSOR;
 
-  const { data, loading, error, refetch } = useFetch(inventoryApi.listModels);
+  const { data, loading, error, refetch } = useFetch(inventoryApi.listModels, [], true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [dtiTab, setDtiTab] = useState<"stock" | "pending" | "loans">("stock");

@@ -49,8 +49,8 @@ interface LiveLabMapProps {
 }
 
 function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação em Tempo Real" }: LiveLabMapProps) {
-  const { data: labs, loading: labsLoading } = useFetch(labsApi.list);
-  const { data: today, loading: todayLoading } = useFetch(reservationsApi.listToday);
+  const { data: labs, loading: labsLoading } = useFetch(labsApi.list, [], true);
+  const { data: today, loading: todayLoading } = useFetch(reservationsApi.listToday, [], true);
   
   const [blockFilter, setBlockFilter] = useState<string>("all");
 
@@ -163,10 +163,10 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
 // DASHBOARD DTI
 // ============================================================================
 function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
-  const { data: pending }  = useFetch(reservationsApi.listPending);
-  const { data: today }    = useFetch(reservationsApi.listToday);
-  const { data: software } = useFetch(reservationsApi.listAwaitingSoftware);
-  const { data: tickets }  = useFetch(maintenanceApi.list);
+  const { data: pending }  = useFetch(reservationsApi.listPending, [], true);
+  const { data: today }    = useFetch(reservationsApi.listToday, [], true);
+  const { data: software } = useFetch(reservationsApi.listAwaitingSoftware, [], true);
+  const { data: tickets }  = useFetch(maintenanceApi.list, [], true);
 
   return (
     <div className="space-y-8 pb-12 w-full">
@@ -237,7 +237,7 @@ function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
 // DASHBOARD DO PROFESSOR
 // ============================================================================
 function ProfessorDashboard({ onNewReservation }: { onNewReservation: () => void }) {
-  const { data, loading, error, refetch } = useFetch(reservationsApi.listMy);
+  const { data, loading, error, refetch } = useFetch(reservationsApi.listMy, [], true);
   const { showToast, ToastComponent } = useToast();
   
   const [weekdayFilter, setWeekdayFilter] = useState<string>("all");

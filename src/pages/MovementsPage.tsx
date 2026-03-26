@@ -32,7 +32,7 @@ function fmtDateTime(iso: string) {
 }
 
 export function MovementsPage() {
-  const { data, loading, error, refetch } = useFetch(inventoryApi.listMovements);
+  const { data, loading, error, refetch } = useFetch(inventoryApi.listMovements, [], true);
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
 

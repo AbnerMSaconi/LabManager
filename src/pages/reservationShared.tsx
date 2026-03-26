@@ -145,7 +145,7 @@ export function MaterialsBadge({ items }: { items: ReservationItem[] }) {
 export function TimetableWizard({ onClose }: { onClose: () => void }) {
   const { showToast, ToastComponent } = useToast();
   const { data: labs, loading: labsLoading } = useFetch(labsApi.list);
-  const { data: allReservations, loading: resLoading } = useFetch(reservationsApi.listAll);
+  const { data: allReservations, loading: resLoading } = useFetch(reservationsApi.listAll, [], true);
 
   const [step, setStep]                             = useState(1);
   const [selectedBlock, setSelectedBlock]           = useState<string | null>(null);

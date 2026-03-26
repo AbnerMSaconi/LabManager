@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ApiError } from "../api/client";
 
 interface FetchState<T> {
@@ -8,11 +8,17 @@ interface FetchState<T> {
   refetch: () => void;
 }
 
-export function useFetch<T>(fetcher: () => Promise<T>, deps: unknown[] = []): FetchState<T> {
+// 🔹 Adicionado o parâmetro 'listenToSSE' com valor padrão false
+export function useFetch<T>(
+  fetcher: () => Promise<T>, 
+  deps: unknown[] = [], 
+  listenToSSE: boolean = false
+): FetchState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const depsRef = useRef(deps);
 
   const refetch = useCallback(() => setTick(t => t + 1), []);
 
@@ -33,7 +39,16 @@ export function useFetch<T>(fetcher: () => Promise<T>, deps: unknown[] = []): Fe
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, ...deps]);
+  }, [tick, ...depsRef.current]);
+
+  useEffect(() => {
+    if (!listenToSSE) return;
+
+    const handleSseUpdate = () => refetch();
+
+    window.addEventListener("sse-update", handleSseUpdate);
+    return () => window.removeEventListener("sse-update", handleSseUpdate);
+  }, [listenToSSE, refetch]);
 
   return { data, loading, error, refetch };
 }

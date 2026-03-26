@@ -17,6 +17,7 @@ import { DailyPage }         from "./pages/DailyPage";
 import { MaintenancePage }   from "./pages/MaintenancePage";
 import { UsersPage }         from "./pages/UsersPage";
 import { MovementsPage }     from "./pages/MovementsPage";
+import { SSEListener } from './components/SSEListener'; // 🔹 Adicione este import
 
 // ── Dark mode hook ────────────────────────────────────────────────────────────
 function useDarkMode() {
@@ -485,5 +486,10 @@ function Shell() {
 }
 
 export default function App() {
-  return <AuthProvider><Shell /></AuthProvider>;
+  return (
+    <AuthProvider>
+      <SSEListener /> {/* 🔹 Adicionado aqui para rodar de forma invisível */}
+      <Shell />
+    </AuthProvider>
+  );
 }

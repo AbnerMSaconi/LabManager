@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from ..deps import get_db, RoleChecker, get_current_user
+from .sse import broadcast
 from ...models.base_models import (
     ItemModel, Reservation, ReservationItem, ReservationStatus,
     User, UserRole, InstitutionLoan, InventoryMovement
@@ -74,6 +75,7 @@ async def create_item_model(
     db.add(model)
     db.commit()
     db.refresh(model)
+    await broadcast("INVENTORY_UPDATED", {"id": model.id, "action": "created"})
     return model
 
 
@@ -93,6 +95,7 @@ async def update_item_model(
     if payload.image_url   is not None: model.image_url   = payload.image_url
     if payload.total_stock is not None: model.total_stock = payload.total_stock
     db.commit()
+    await broadcast("INVENTORY_UPDATED", {"id": model_id, "action": "updated"})
     return model
 
 

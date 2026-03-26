@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 
 # Ajuste os imports relativos conforme a estrutura real
 from ..deps import get_db, RoleChecker
+from .sse import broadcast
 from ...models.base_models import MaintenanceTicket, User, UserRole
 from ...schemas.reservation_schemas import TicketCreate, TicketResolve
 
@@ -55,6 +56,7 @@ async def create_ticket(
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
+    await broadcast("MAINTENANCE_CREATED", {"id": ticket.id, "lab_id": payload.lab_id})
     return {"message": "Chamado aberto com sucesso.", "id": ticket.id}
 
 @router.patch("/{ticket_id}")
@@ -74,4 +76,5 @@ async def resolve_ticket(
     if payload.status == "resolvido":
         ticket.resolved_at = dt.utcnow()
     db.commit()
+    await broadcast("MAINTENANCE_UPDATED", {"id": ticket_id, "status": payload.status})
     return {"message": "Chamado atualizado."}

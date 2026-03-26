@@ -260,7 +260,7 @@ const WEEKDAYS = [
 
 // ── Página Principal ────────────────────────────────────────────────────────
 export function DailyPage() {
-  const { data, loading, error, refetch } = useFetch(reservationsApi.listAll);
+  const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
   const { ToastComponent } = useToast();
 
   const [checkoutTarget, setCheckoutTarget] = useState<Reservation | null>(null);

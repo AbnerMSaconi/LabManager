@@ -110,7 +110,7 @@ function ReservationCard({ res }: { res: CardItem; key?: React.Key }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function ReservationPageProfessor({ onNewReservation }: { onNewReservation: () => void }) {
-  const { data, loading, error, refetch } = useFetch(reservationsApi.listMy);
+  const { data, loading, error, refetch } = useFetch(reservationsApi.listMy, [], true);
 
   const cards = useMemo<CardItem[]>(() => {
     if (!data) return [];
