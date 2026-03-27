@@ -1,20 +1,21 @@
 services:
 
-  # ── Banco de dados PostgreSQL ──────────────────────────────────────────────
+  # ── Banco de dados Microsoft SQL Server ────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: mcr.microsoft.com/mssql/server:2022-latest
     restart: always
     environment:
-      POSTGRES_DB:       ${POSTGRES_DB:-labmanager}
-      POSTGRES_USER:     ${POSTGRES_USER:-labmanager}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labmanager123}
+      ACCEPT_EULA:        "Y"
+      MSSQL_SA_PASSWORD:  ${MSSQL_SA_PASSWORD:-LabManager_2024!}
+      MSSQL_PID:          Developer
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mssql_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labmanager}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P '${MSSQL_SA_PASSWORD:-LabManager_2024!}' -C -Q 'SELECT 1' -b || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - labmanager_net
 
@@ -27,7 +28,7 @@ services:
     expose:
       - "8000"
     environment:
-      DATABASE_URL:                  postgresql://${POSTGRES_USER:-labmanager}:${POSTGRES_PASSWORD:-labmanager123}@db:5432/${POSTGRES_DB:-labmanager}
+      DATABASE_URL:                  mssql+pyodbc://SA:${MSSQL_SA_PASSWORD:-LabManager_2024!}@db:1433/labmanager?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
       SECRET_KEY:                    ${SECRET_KEY:-TROQUE-ESTA-CHAVE-EM-PRODUCAO}
       ALGORITHM:                     HS256
       ACCESS_TOKEN_EXPIRE_MINUTES:   ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
@@ -61,7 +62,7 @@ services:
       - labmanager_net
 
 volumes:
-  postgres_data:
+  mssql_data:
 
 networks:
   labmanager_net:

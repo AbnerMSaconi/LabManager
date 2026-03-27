@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("damage_observation", sa.Text(),      nullable=True),
         sa.Column("is_operational",     sa.Boolean(),   nullable=True),
         sa.Column("created_by_id",      sa.Integer(),   sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("created_at",         sa.DateTime(),  nullable=False, server_default=sa.func.now()),
+        sa.Column("created_at",         sa.DateTime(),  nullable=False, server_default=sa.text("GETDATE()")),
         sa.Column("returned_at",        sa.DateTime(),  nullable=True),
     )
 
@@ -41,7 +41,7 @@ def upgrade() -> None:
         sa.Column("reservation_id", sa.Integer(),   sa.ForeignKey("reservations.id"), nullable=True),
         sa.Column("loan_id",        sa.Integer(),   sa.ForeignKey("institution_loans.id"), nullable=True),
         sa.Column("observation",    sa.Text(),      nullable=True),
-        sa.Column("created_at",     sa.DateTime(),  nullable=False, server_default=sa.func.now()),
+        sa.Column("created_at",     sa.DateTime(),  nullable=False, server_default=sa.text("GETDATE()")),
     )
 
 

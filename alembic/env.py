@@ -12,7 +12,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-db_url = os.getenv("DATABASE_URL", "sqlite:///./labmanager.db")
+db_url = os.getenv(
+    "DATABASE_URL",
+    "mssql+pyodbc://SA:LabManager_2024!@localhost:1433/labmanager?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+)
 
 def run_migrations_offline() -> None:
     context.configure(

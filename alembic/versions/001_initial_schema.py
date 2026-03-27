@@ -93,7 +93,7 @@ def upgrade() -> None:
         sa.Column("approved_by_id",               sa.Integer(),  sa.ForeignKey("users.id"), nullable=True),
         sa.Column("rejection_reason",             sa.Text(),     nullable=True),
         sa.Column("approval_notes",               sa.Text(),     nullable=True),
-        sa.Column("created_at",                   sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("created_at",                   sa.DateTime(), nullable=False, server_default=sa.text("GETDATE()")),
     )
 
     op.create_table("reservation_slots",
@@ -123,7 +123,7 @@ def upgrade() -> None:
         sa.Column("status",           sa.String(30), nullable=False, server_default="aberto"),
         sa.Column("severity",         sa.String(20), nullable=False, server_default="medio"),
         sa.Column("resolution_notes", sa.Text(),     nullable=True),
-        sa.Column("created_at",       sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("created_at",       sa.DateTime(), nullable=False, server_default=sa.text("GETDATE()")),
         sa.Column("resolved_at",      sa.DateTime(), nullable=True),
     )
 
