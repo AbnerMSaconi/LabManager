@@ -4,6 +4,7 @@ export enum UserRole {
   DTI_TECNICO = "dti_tecnico",
   PROGEX = "progex",
   ADMINISTRADOR = "administrador",
+  SUPER_ADMIN = "super_admin",
 }
 
 export enum ReservationStatus {
@@ -130,6 +131,7 @@ export interface StockItem extends ItemModel {
   in_use: number;
   in_loans: number;
   available_qty: number;
+  maintenance_stock: number;
 }
 
 export interface InventoryMovement {
@@ -145,4 +147,36 @@ export interface InventoryMovement {
   created_at: string;
   model?: { id: number; name: string; category: string };
   operator?: { id: number; full_name: string; role: string };
+}
+
+export interface QuarantineRecord {
+  id: number;
+  name: string;
+  deleted_at: string;
+}
+
+export interface QuarantineData {
+  users: QuarantineRecord[];
+  laboratories: QuarantineRecord[];
+  softwares: QuarantineRecord[];
+  item_models: QuarantineRecord[];
+}
+
+export interface AuditLogEntry {
+  id: number;
+  table_name: string;
+  record_id: number;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  user_id: number | null;
+  author_name: string | null;
+  created_at: string;
+}
+
+export interface BackupEntry {
+  id: number;
+  filename: string;
+  created_at: string;
+  size_mb: number | null;
+  triggered_by_id: number | null;
 }

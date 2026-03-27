@@ -26,6 +26,7 @@ export interface ItemModelPayload {
   description?: string;
   image_url?: string;
   total_stock: number;
+  maintenance_stock?: number;
 }
 
 export interface LoanCreatePayload {
@@ -42,6 +43,11 @@ export interface LoanReturnPayload {
   has_damage: boolean;
   is_operational?: boolean;
   damage_observation?: string;
+}
+export interface MaintenanceResolvePayload {
+  qty_repaired: number;
+  qty_discarded: number;
+  observation?: string;
 }
 
 export const inventoryApi = {
@@ -60,4 +66,6 @@ export const inventoryApi = {
   checkin:        (payload: CheckinPayload)  => api.post<{ message: string }>("/api/v1/logistics/checkin", payload),
   listStock:      ()                         => api.get<StockItem[]>("/api/v1/inventory/stock"),
   listMovements:  ()                         => api.get<InventoryMovement[]>("/api/v1/inventory/movements"),
+  resolveMaintenance: (id: number, p: MaintenanceResolvePayload) => 
+  api.post<{ message: string }>(`/api/v1/inventory/item-models/${id}/resolve-maintenance`, p),
 };

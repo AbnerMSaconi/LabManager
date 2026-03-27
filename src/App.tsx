@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, Calendar, Package, Monitor,
   LogOut, Clock, Wrench, Building2,
-  Menu, X, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight,
+  Menu, X, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, ShieldCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole } from "./types";
@@ -19,6 +19,7 @@ import { UsersPage }         from "./pages/UsersPage";
 import { MovementsPage }     from "./pages/MovementsPage";
 import { SSEListener } from './components/SSEListener';
 import { SettingsPage } from "./pages/SettingsPage";
+import SysAdminPage from "./pages/SysAdminPage";
 
 // ── Dark mode hook ────────────────────────────────────────────────────────────
 function useDarkMode() {
@@ -39,15 +40,16 @@ function useDarkMode() {
 interface MenuItem { id: string; label: string; icon: React.ElementType; roles: UserRole[] }
 
 const MENU_ITEMS: MenuItem[] = [
-  { id: "dashboard",    label: "Início",          icon: LayoutDashboard, roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
-  { id: "daily",        label: "Agenda do Dia",   icon: Clock,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
-  { id: "reservations", label: "Reservas",         icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
-  { id: "inventory",    label: "Almoxarifado",     icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR] },
-  { id: "labs",         label: "Laboratórios",     icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR] },
-  { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
-  { id: "movements",   label: "Movimentações",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR] },
-  { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
-  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR] },
+  { id: "dashboard",    label: "Início",          icon: LayoutDashboard, roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "daily",        label: "Agenda do Dia",   icon: Clock,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "reservations", label: "Reservas",         icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "inventory",    label: "Almoxarifado",     icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "labs",         label: "Laboratórios",     icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "movements",   label: "Movimentações",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "governance",   label: "Governança",       icon: ShieldCheck,     roles: [UserRole.SUPER_ADMIN] },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -56,6 +58,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.DTI_TECNICO]:     "DTI Técnico",
   [UserRole.PROGEX]:          "Progex · Admin",
   [UserRole.ADMINISTRADOR]:   "Administrador",
+  [UserRole.SUPER_ADMIN]:     "Super Admin",
 };
 
 // ── Sidebar desktop (colapsável) ──────────────────────────────────────────────
@@ -471,6 +474,7 @@ function Shell() {
                   {activeTab === "movements"   && <MovementsPage />}
                   {activeTab === "users"        && <UsersPage />}
                   {activeTab === "settings"     && <SettingsPage />}
+                  {activeTab === "governance"   && <SysAdminPage />}
                 </motion.div>
               )}
             </AnimatePresence>

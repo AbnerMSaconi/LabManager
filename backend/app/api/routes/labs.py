@@ -1,12 +1,14 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from typing import List, Optional
 from pydantic import BaseModel
 
 from ..deps import get_db, RoleChecker, get_current_user
 from ...models.base_models import (
     Laboratory, Software as SoftwareModel, LessonSlot,
-    Reservation, ReservationSlot, ReservationStatus, User, UserRole
+    Reservation, ReservationSlot, ReservationStatus, User, UserRole, AuditLog
 )
 from ...schemas.reservation_schemas import LaboratoryCreate, LaboratoryUpdate, SoftwareCreate
 
@@ -72,7 +74,7 @@ async def list_labs(
 ):
     return db.query(Laboratory).options(
         joinedload(Laboratory.softwares)
-    ).all()
+    ).filter(Laboratory.deleted_at == None).all()
 
 
 @router.get("/labs/{lab_id}")
@@ -83,7 +85,7 @@ async def get_lab(
 ):
     lab = db.query(Laboratory).options(
         joinedload(Laboratory.softwares)
-    ).filter(Laboratory.id == lab_id).first()
+    ).filter(Laboratory.id == lab_id, Laboratory.deleted_at == None).first()
     if not lab:
         raise HTTPException(status_code=404, detail="Laboratório não encontrado.")
     return lab
@@ -93,7 +95,7 @@ async def get_lab(
 async def create_lab(
     payload: LaboratoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     VALID_BLOCKS = {"Bloco A", "Bloco B", "Bloco C"}
     if payload.block not in VALID_BLOCKS:
@@ -119,11 +121,17 @@ async def update_lab(
     lab_id: int,
     payload: LaboratoryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
-    lab = db.query(Laboratory).options(joinedload(Laboratory.softwares)).filter(Laboratory.id == lab_id).first()
+    lab = db.query(Laboratory).options(joinedload(Laboratory.softwares)).filter(Laboratory.id == lab_id, Laboratory.deleted_at == None).first()
     if not lab:
         raise HTTPException(status_code=404, detail="Laboratório não encontrado.")
+
+    old_data = {
+        "name": lab.name, "block": lab.block, "room_number": lab.room_number,
+        "capacity": lab.capacity, "is_practical": lab.is_practical,
+        "description": lab.description, "is_active": lab.is_active
+    }
 
     VALID_BLOCKS = {"Bloco A", "Bloco B", "Bloco C"}
     if payload.name        is not None: lab.name        = payload.name
@@ -141,6 +149,20 @@ async def update_lab(
         for sw_id in payload.software_ids:
             sw = db.query(SoftwareModel).filter(SoftwareModel.id == sw_id).first()
             if sw: lab.softwares.append(sw)
+
+    new_data = {
+        "name": lab.name, "block": lab.block, "room_number": lab.room_number,
+        "capacity": lab.capacity, "is_practical": lab.is_practical,
+        "description": lab.description, "is_active": lab.is_active
+    }
+    audit = AuditLog(
+        table_name="laboratories",
+        record_id=lab_id,
+        old_data=json.dumps(old_data, ensure_ascii=False),
+        new_data=json.dumps(new_data, ensure_ascii=False),
+        user_id=current_user.id,
+    )
+    db.add(audit)
     db.commit()
     return {"message": "Laboratório atualizado."}
 
@@ -149,14 +171,14 @@ async def update_lab(
 async def delete_lab(
     lab_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
-    lab = db.query(Laboratory).filter(Laboratory.id == lab_id).first()
+    lab = db.query(Laboratory).filter(Laboratory.id == lab_id, Laboratory.deleted_at == None).first()
     if not lab:
         raise HTTPException(status_code=404, detail="Laboratório não encontrado.")
-    db.delete(lab)
+    lab.deleted_at = func.now()
     db.commit()
-    return {"message": "Laboratório excluído."}
+    return {"message": "Laboratório movido para a quarentena."}
 
 
 @router.get("/slots")
@@ -172,14 +194,14 @@ async def list_softwares(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return db.query(SoftwareModel).all()
+    return db.query(SoftwareModel).filter(SoftwareModel.deleted_at == None).all()
 
 
 @router.post("/softwares", status_code=status.HTTP_201_CREATED)
 async def create_software(
     payload: SoftwareCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     sw = SoftwareModel(name=payload.name, version=payload.version)
     db.add(sw)
@@ -192,11 +214,11 @@ async def create_software(
 async def delete_software(
     sw_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
-    sw = db.query(SoftwareModel).filter(SoftwareModel.id == sw_id).first()
+    sw = db.query(SoftwareModel).filter(SoftwareModel.id == sw_id, SoftwareModel.deleted_at == None).first()
     if not sw:
         raise HTTPException(status_code=404, detail="Software não encontrado.")
-    db.delete(sw)
+    sw.deleted_at = func.now()
     db.commit()
-    return {"message": "Software removido."}
+    return {"message": "Software movido para a quarentena."}

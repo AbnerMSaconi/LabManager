@@ -1,18 +1,21 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from pydantic import BaseModel
+from typing import Optional
 
 from ..deps import get_db, RoleChecker, get_current_user
 from .sse import broadcast
 from ...models.base_models import (
     ItemModel, Reservation, ReservationItem, ReservationStatus,
-    User, UserRole, InstitutionLoan, InventoryMovement
+    User, UserRole, InstitutionLoan, InventoryMovement, AuditLog
 )
 from ...schemas.reservation_schemas import ItemModelCreate, ItemModelUpdate
 
 router = APIRouter(prefix="/api/v1/inventory", tags=["inventário"])
 
-_ALMOX = [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR]
+_ALMOX = [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
 
 
 @router.get("/models")
@@ -20,7 +23,7 @@ async def list_item_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return db.query(ItemModel).all()
+    return db.query(ItemModel).filter(ItemModel.deleted_at == None).all()
 
 
 @router.get("/models/available")
@@ -49,13 +52,15 @@ async def list_available_models(
     ).group_by(ReservationItem.item_model_id).all()
 
     reserved_map = {row.item_model_id: row.total_reserved for row in reserved_rows}
-    models = db.query(ItemModel).all()
+    models = db.query(ItemModel).filter(ItemModel.deleted_at == None).all()
     return [
         {
             "id": m.id, "name": m.name, "category": m.category,
             "description": m.description, "image_url": m.image_url,
             "total_stock": m.total_stock,
             "available_qty": max(0, m.total_stock - reserved_map.get(m.id, 0)),
+            "total_stock": m.total_stock,
+            "available_qty": max(0, m.total_stock - reserved_map.get(m.id, 0) - m.maintenance_stock),
         }
         for m in models
     ]
@@ -86,14 +91,35 @@ async def update_item_model(
     db: Session = Depends(get_db),
     current_user: User = Depends(RoleChecker(_ALMOX)),
 ):
-    model = db.query(ItemModel).filter(ItemModel.id == model_id).first()
+    model = db.query(ItemModel).filter(ItemModel.id == model_id, ItemModel.deleted_at == None).first()
     if not model:
         raise HTTPException(status_code=404, detail="Modelo não encontrado.")
+
+    old_data = {
+        "name": model.name, "category": model.category,
+        "description": model.description, "image_url": model.image_url,
+        "total_stock": model.total_stock,
+    }
+
     if payload.name        is not None: model.name        = payload.name
     if payload.category    is not None: model.category    = payload.category.value if hasattr(payload.category, "value") else payload.category
     if payload.description is not None: model.description = payload.description
     if payload.image_url   is not None: model.image_url   = payload.image_url
     if payload.total_stock is not None: model.total_stock = payload.total_stock
+
+    new_data = {
+        "name": model.name, "category": model.category,
+        "description": model.description, "image_url": model.image_url,
+        "total_stock": model.total_stock,
+    }
+    audit = AuditLog(
+        table_name="item_models",
+        record_id=model_id,
+        old_data=json.dumps(old_data, ensure_ascii=False),
+        new_data=json.dumps(new_data, ensure_ascii=False),
+        user_id=current_user.id,
+    )
+    db.add(audit)
     db.commit()
     await broadcast("INVENTORY_UPDATED", {"id": model_id, "action": "updated"})
     return model
@@ -118,7 +144,7 @@ async def get_realtime_stock(
     ).filter(InstitutionLoan.status == "em_aberto").group_by(InstitutionLoan.item_model_id).all()
     loan_map = {r.item_model_id: r.total for r in loan_rows}
 
-    models = db.query(ItemModel).all()
+    models = db.query(ItemModel).filter(ItemModel.deleted_at == None).all()
     return [
         {
             "id": m.id, "name": m.name, "category": m.category,
@@ -126,7 +152,8 @@ async def get_realtime_stock(
             "total_stock": m.total_stock,
             "in_use": in_use_map.get(m.id, 0),
             "in_loans": loan_map.get(m.id, 0),
-            "available_qty": max(0, m.total_stock - in_use_map.get(m.id, 0) - loan_map.get(m.id, 0)),
+            "maintenance_stock": m.maintenance_stock, # Exposto para o frontend
+            "available_qty": max(0, m.total_stock - in_use_map.get(m.id, 0) - loan_map.get(m.id, 0) - m.maintenance_stock),
         }
         for m in models
     ]
@@ -200,3 +227,52 @@ async def list_pending_material_requests(
         }
         for r in reservations
     ]
+class MaintenanceResolvePayload(BaseModel):
+    qty_repaired: int = 0
+    qty_discarded: int = 0
+    observation: Optional[str] = None
+
+@router.post("/item-models/{model_id}/resolve-maintenance", tags=["inventário"])
+async def resolve_maintenance(
+    model_id: int,
+    payload: MaintenanceResolvePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(_ALMOX)),
+):
+    model = db.query(ItemModel).filter(ItemModel.id == model_id, ItemModel.deleted_at == None).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Item não encontrado.")
+
+    total_resolved = payload.qty_repaired + payload.qty_discarded
+    if total_resolved <= 0:
+        raise HTTPException(status_code=400, detail="Informe uma quantidade a ser reparada ou descartada.")
+    if total_resolved > model.maintenance_stock:
+        raise HTTPException(status_code=400, detail="Quantidade informada excede o estoque em manutenção.")
+
+    # Atualiza o estoque: reparados voltam a ser 'available' implicitamente, descartados somem do 'total'
+    model.maintenance_stock -= total_resolved
+    model.total_stock = max(0, model.total_stock - payload.qty_discarded)
+
+    # Gera os logs de movimentação para rastreabilidade
+    if payload.qty_repaired > 0:
+        db.add(InventoryMovement(
+            item_model_id=model_id,
+            action="reparo",
+            quantity=payload.qty_repaired,
+            operator_id=current_user.id,
+            target="Estoque Disponível",
+            observation=payload.observation
+        ))
+    if payload.qty_discarded > 0:
+        db.add(InventoryMovement(
+            item_model_id=model_id,
+            action="descarte",
+            quantity=payload.qty_discarded,
+            operator_id=current_user.id,
+            target="Descarte / Lixo",
+            observation=payload.observation
+        ))
+
+    db.commit()
+    await broadcast("INVENTORY_UPDATED", {"id": model_id, "action": "maintenance_resolved"})
+    return {"message": "Manutenção resolvida com sucesso."}

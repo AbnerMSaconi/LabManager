@@ -4,13 +4,13 @@ import { User } from "../types";
 export interface LoginResponse {
   access_token: string;
   token_type: string;
-  user: { id: number; email: string; role: string; full_name: string; registration_number: string };
+  user: { id: number; role: string; full_name: string; registration_number: string };
 }
 
-export async function login(registrationOrEmail: string, password: string): Promise<LoginResponse> {
+export async function login(registration: string, password: string): Promise<LoginResponse> {
   // FastAPI OAuth2PasswordRequestForm usa campos 'username' e 'password'
   const form = new URLSearchParams();
-  form.set("username", registrationOrEmail);
+  form.set("username", registration);
   form.set("password", password);
   return api.postForm<LoginResponse>("/api/v1/auth/login", form);
 }

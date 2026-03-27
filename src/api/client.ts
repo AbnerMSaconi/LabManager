@@ -55,7 +55,18 @@ async function request<T>(
     let detail = `Erro ${res.status}`;
     try {
       const body = await res.json();
-      detail = body.detail ?? detail;
+      if (typeof body.detail === "string") {
+        detail = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        // Pydantic v2 retorna [{loc, msg, type}] — extrai as mensagens legíveis
+        detail = body.detail
+          .map((e: { msg?: string; loc?: unknown[] }) => {
+            const loc = Array.isArray(e.loc) ? e.loc.join(".") : "";
+            return loc ? `[${loc}] ${e.msg ?? JSON.stringify(e)}` : (e.msg ?? JSON.stringify(e));
+          })
+          .join("; ");
+        console.error("[API 422] Validation errors:", body.detail);
+      }
     } catch (_) {}
     throw new ApiError(res.status, detail);
   }

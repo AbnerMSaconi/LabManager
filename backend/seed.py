@@ -52,9 +52,9 @@ def seed_data():
         # 2. USUÁRIOS (40 Professores)
         # ---------------------------------------------------------
         base_users = [
-            {"registration_number": "RF001", "email": "progex@universidade.edu", "full_name": "Coordenação Progex", "role": "progex", "hashed_password": pwd_context.hash("progex123")},
-            {"registration_number": "RF002", "email": "tecnico@universidade.edu", "full_name": "Carlos Técnico DTI", "role": "dti_tecnico", "hashed_password": pwd_context.hash("tecnico123")},
-            {"registration_number": "RF003", "email": "estagiario@universidade.edu", "full_name": "Ana Estagiária DTI", "role": "dti_estagiario","hashed_password": pwd_context.hash("estagiario123")},
+            {"registration_number": "RF001", "full_name": "Coordenação Progex", "role": "progex", "hashed_password": pwd_context.hash("progex123")},
+            {"registration_number": "RF002", "full_name": "Carlos Técnico DTI", "role": "dti_tecnico", "hashed_password": pwd_context.hash("tecnico123")},
+            {"registration_number": "RF003", "full_name": "Ana Estagiária DTI", "role": "dti_estagiario","hashed_password": pwd_context.hash("estagiario123")},
         ]
         
         professores_nomes = [
@@ -72,7 +72,6 @@ def seed_data():
         for idx, nome in enumerate(professores_nomes):
             prof_users.append({
                 "registration_number": f"RA2024{idx:03d}",
-                "email": f"prof{idx}@universidade.edu",
                 "full_name": f"Prof. {nome}",
                 "role": "professor",
                 "hashed_password": pwd_context.hash("professor123")

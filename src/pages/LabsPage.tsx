@@ -1,24 +1,21 @@
 import React, { useState } from "react";
-import { Plus, Pencil, Trash2, Monitor, ChevronDown, ChevronUp, X, Check } from "lucide-react";
-import { UserRole, Laboratory, LaboratoryBlock, Software, Reservation } from "../types";
+import { Plus, Pencil, Trash2, Monitor, ChevronDown, ChevronUp, X, Check, Building2 } from "lucide-react";
+import { UserRole, Laboratory, Software, Reservation } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import { labsApi, CreateLabPayload, UpdateLabPayload } from "../api/labsApi";
 import { reservationsApi } from "../api/reservationsApi";
 import { useToast, LoadingSpinner, ErrorMessage } from "../components/ui";
 import { ApiError } from "../api/client";
+import { CustomDropdown } from "./reservationShared";
 
-const BLOCKS = ["Bloco A", "Bloco B", "Bloco C"];
+const BLOCKS = ["Bloco A", "Bloco B", "Bloco C", "Bloco M"];
 
 const BLOCK_COLORS: Record<string, string> = {
-  "Bloco A": "var(--info-bg)",
-  "Bloco B": "var(--purple-bg)",
-  "Bloco C": "var(--success-bg)",
-};
-const BLOCK_TEXT: Record<string, string> = {
-  "Bloco A": "var(--info-text)",
-  "Bloco B": "var(--purple-text)",
-  "Bloco C": "var(--success-text)",
+  "Bloco A": "bg-blue-50 text-blue-700 border-blue-200",
+  "Bloco B": "bg-purple-50 text-purple-700 border-purple-200",
+  "Bloco C": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Bloco M": "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 interface LabFormProps {
@@ -58,96 +55,87 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1"
-            style={{ color: "var(--text-secondary)" }}>Nome do Laboratório</label>
+          <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Nome do Laboratório *</label>
           <input required value={form.name} onChange={e => set("name", e.target.value)}
             placeholder="Ex: LabInf 4"
-            className="w-full rounded-xl py-2.5 px-4 border text-sm"
-            style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }} />
+            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm transition-shadow" />
+        </div>
+        <div className="z-[70]">
+          <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Bloco</label>
+          <CustomDropdown 
+            value={form.block} 
+            options={BLOCKS.map(b => ({ value: b, label: b }))} 
+            onChange={v => set("block", v)} 
+            icon={Building2} 
+          />
         </div>
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1"
-            style={{ color: "var(--text-secondary)" }}>Bloco</label>
-          <select value={form.block} onChange={e => set("block", e.target.value)}
-            className="w-full rounded-xl py-2.5 px-4 border text-sm"
-            style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }}>
-            {BLOCKS.map(b => <option key={b}>{b}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1"
-            style={{ color: "var(--text-secondary)" }}>Número da Sala</label>
+          <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Número da Sala *</label>
           <input required value={form.room_number} onChange={e => set("room_number", e.target.value)}
             placeholder="Ex: 201"
-            className="w-full rounded-xl py-2.5 px-4 border text-sm"
-            style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }} />
+            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm transition-shadow" />
         </div>
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1"
-            style={{ color: "var(--text-secondary)" }}>Capacidade (máquinas)</label>
+          <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Capacidade (máquinas)</label>
           <input type="number" required min={1} value={form.capacity}
             onChange={e => set("capacity", Number(e.target.value))}
-            className="w-full rounded-xl py-2.5 px-4 border text-sm"
-            style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }} />
+            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm transition-shadow" />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider mb-1"
-          style={{ color: "var(--text-secondary)" }}>Descrição (opcional)</label>
+        <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Descrição (opcional)</label>
         <textarea rows={2} value={form.description} onChange={e => set("description", e.target.value)}
           placeholder="Descreva o laboratório..."
-          className="w-full rounded-xl py-2.5 px-4 border text-sm resize-none"
-          style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }} />
+          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 resize-none shadow-sm transition-shadow" />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
         <input type="checkbox" id="practical" checked={form.is_practical}
           onChange={e => set("is_practical", e.target.checked)}
-          className="w-4 h-4 rounded" />
-        <label htmlFor="practical" className="text-sm" style={{ color: "var(--text-primary)" }}>
-          Laboratório prático (permite solicitação de materiais do almoxarifado)
+          className="w-5 h-5 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 cursor-pointer" />
+        <label htmlFor="practical" className="text-sm font-bold text-neutral-700 cursor-pointer select-none">
+          Laboratório prático <span className="font-medium text-neutral-500">(permite uso de materiais do almoxarifado)</span>
         </label>
       </div>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider mb-2"
-          style={{ color: "var(--text-secondary)" }}>Softwares instalados</label>
-        <div className="flex flex-wrap gap-2">
-          {softwares.map(sw => {
-            const sel = form.software_ids.includes(sw.id);
-            return (
-              <button key={sw.id} type="button" onClick={() => toggleSoftware(sw.id)}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5"
-                style={{
-                  background: sel ? "var(--ucdb-blue)" : "var(--bg-secondary)",
-                  color: sel ? "#fff" : "var(--text-secondary)",
-                  borderColor: sel ? "var(--ucdb-blue)" : "var(--border)",
-                }}>
-                {sel && <Check size={11} />}
-                {sw.name} {sw.version ? `(${sw.version})` : ""}
-              </button>
-            );
-          })}
-          {softwares.length === 0 && (
-            <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>Nenhum software cadastrado ainda.</p>
-          )}
+        <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-2 flex items-center justify-between">
+          Softwares Instalados
+          <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">{form.software_ids.length} selecionado(s)</span>
+        </label>
+        <div className="bg-neutral-50 border border-neutral-100 rounded-2xl p-3">
+          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+            {softwares.map(sw => {
+              const sel = form.software_ids.includes(sw.id);
+              return (
+                <button key={sw.id} type="button" onClick={() => toggleSoftware(sw.id)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border active:scale-95 ${
+                    sel ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-100"
+                  }`}>
+                  {sel && <Check size={12} />}
+                  {sw.name} {sw.version ? `(${sw.version})` : ""}
+                </button>
+              );
+            })}
+            {softwares.length === 0 && (
+              <p className="text-xs text-neutral-400 font-bold p-2">Nenhum software cadastrado no sistema ainda.</p>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="submit" disabled={saving}
-          className="flex-1 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-40"
-          style={{ background: "var(--ucdb-blue)", color: "#fff" }}>
-          {saving ? "Salvando..." : initial ? "Salvar alterações" : "Criar laboratório"}
-        </button>
         <button type="button" onClick={onCancel}
-          className="px-6 py-2.5 rounded-xl font-bold text-sm border"
-          style={{ borderColor: "var(--border)", color: "var(--text-secondary)", background: "var(--bg-secondary)" }}>
+          className="flex-1 py-3 rounded-xl border border-neutral-200 font-bold text-sm text-neutral-600 hover:bg-neutral-100 transition-colors bg-white shadow-sm">
           Cancelar
+        </button>
+        <button type="submit" disabled={saving}
+          className="flex-1 py-3 rounded-xl bg-neutral-900 text-white font-bold text-sm disabled:opacity-50 shadow-md hover:bg-neutral-800 transition-all active:scale-[0.98]">
+          {saving ? <LoadingSpinner label="" /> : initial ? "Salvar alterações" : "Criar laboratório"}
         </button>
       </div>
     </form>
@@ -157,79 +145,66 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
 function LabCard({
   lab, softwares, canEdit, onEdit, onDelete, activeReservations
 }: {
-  lab: Laboratory;
-  softwares: Software[];
-  canEdit: boolean;
-  onEdit: (l: Laboratory) => void;
-  onDelete: (l: Laboratory) => void;
-  activeReservations?: Reservation[];
+  lab: Laboratory; softwares: Software[]; canEdit: boolean;
+  onEdit: (l: Laboratory) => void; onDelete: (l: Laboratory) => void; activeReservations?: Reservation[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const block = lab.block as string;
 
-  // Descobre se o lab está em uso AGORA
-  const currentReservation = activeReservations?.find(r => 
-    r.lab_id === lab.id && r.status === "em_uso"
-  );
-  
-  const pendingOrApproved = activeReservations?.filter(r => 
-    r.lab_id === lab.id && (r.status === "aprovado" || r.status === "pendente")
-  );
+  const currentReservation = activeReservations?.find(r => r.lab_id === lab.id && r.status === "em_uso");
+  const pendingOrApproved = activeReservations?.filter(r => r.lab_id === lab.id && (r.status === "aprovado" || r.status === "pendente"));
 
   return (
-    <div className="rounded-2xl border overflow-hidden shadow-sm transition-all"
-      style={{ background: "var(--bg-card)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}>
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
+    <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden">
+      <div className="p-6">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-3 rounded-xl shrink-0"
-              style={{ background: BLOCK_COLORS[block] ?? "var(--bg-secondary)" }}>
-              <Monitor size={20} style={{ color: BLOCK_TEXT[block] ?? "var(--text-primary)" }} />
+            <div className={`p-3 rounded-2xl shrink-0 shadow-inner border ${BLOCK_COLORS[block] ?? "bg-neutral-100 text-neutral-500 border-neutral-200"}`}>
+              <Monitor size={24} />
             </div>
             <div className="min-w-0">
-              <h4 className="font-bold text-base truncate" style={{ color: "var(--text-primary)" }}>{lab.name}</h4>
-              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                {lab.block} · Sala {lab.room_number} · {lab.capacity} máquinas
+              <h4 className="font-black text-lg text-neutral-900 truncate">{lab.name}</h4>
+              <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-0.5">
+                {lab.block} · Sala {lab.room_number} · {lab.capacity} maq.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: BLOCK_COLORS[block], color: BLOCK_TEXT[block] }}>
-              {block}
-            </span>
             {lab.is_practical && (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                style={{ background: "var(--warning-bg)", color: "var(--warning-text)" }}>
-                PRÁTICO
+              <span className="px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+                Prático
               </span>
             )}
           </div>
         </div>
 
-        {currentReservation && (
-          <div className="mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <p className="text-xs font-bold text-blue-800">
-              EM USO AGORA • {currentReservation.user?.full_name ?? "Professor"}
-            </p>
+        {currentReservation ? (
+          <div className="mt-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 shadow-sm">
+            <span className="flex h-2.5 w-2.5 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+            </span>
+            <div>
+              <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Em uso agora</p>
+              <p className="text-xs font-bold text-blue-700 mt-0.5">{currentReservation.user?.full_name ?? "Professor"}</p>
+            </div>
           </div>
-        )}
-        
-        {!currentReservation && pendingOrApproved && pendingOrApproved.length > 0 && (
-          <div className="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <p className="text-xs font-bold text-amber-800">
-              Reservado para hoje ({pendingOrApproved.length} agendamento{pendingOrApproved.length > 1 ? 's' : ''})
-            </p>
-          </div>
+        ) : (
+          pendingOrApproved && pendingOrApproved.length > 0 && (
+            <div className="mt-3 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3 shadow-sm">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+              <div>
+                <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Reservado hoje</p>
+                <p className="text-xs font-bold text-emerald-700 mt-0.5">{pendingOrApproved.length} agendamento(s)</p>
+              </div>
+            </div>
+          )
         )}
 
         {lab.softwares && lab.softwares.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
+          <div className="flex flex-wrap gap-1.5 mt-4">
             {lab.softwares.map(sw => (
-              <span key={sw.id} className="px-2 py-0.5 rounded-lg text-[10px] font-semibold"
-                style={{ background: "var(--info-bg)", color: "var(--info-text)" }}>
+              <span key={sw.id} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200 shadow-sm">
                 {sw.name}
               </span>
             ))}
@@ -237,26 +212,19 @@ function LabCard({
         )}
 
         {lab.description && (
-          <p className="text-xs mt-2" style={{ color: "var(--text-tertiary)" }}>{lab.description}</p>
+          <p className="text-xs font-medium text-neutral-500 mt-4 leading-relaxed line-clamp-2">{lab.description}</p>
         )}
 
-        <div className="flex items-center justify-between mt-4 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-          <button onClick={() => setExpanded(v => !v)}
-            className="flex items-center gap-1.5 text-xs font-medium"
-            style={{ color: "var(--text-secondary)" }}>
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {expanded ? "Menos detalhes" : "Mais detalhes"}
+        <div className="flex items-center justify-between mt-5 pt-4 border-t border-neutral-100">
+          <button onClick={() => setExpanded(v => !v)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors">
+            {expanded ? "Ocultar Sistema" : "Ver Sistema"} {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
           {canEdit && (
             <div className="flex gap-2">
-              <button onClick={() => onEdit(lab)}
-                className="p-2 rounded-xl border transition-all"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)", background: "var(--bg-secondary)" }}>
+              <button onClick={() => onEdit(lab)} className="p-2 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-900 hover:text-white transition-all shadow-sm active:scale-95" title="Editar">
                 <Pencil size={14} />
               </button>
-              <button onClick={() => onDelete(lab)}
-                className="p-2 rounded-xl border transition-all"
-                style={{ borderColor: "var(--danger-bg)", color: "var(--danger-text)", background: "var(--danger-bg)" }}>
+              <button onClick={() => onDelete(lab)} className="p-2 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-95" title="Excluir">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -264,17 +232,10 @@ function LabCard({
         </div>
 
         {expanded && (
-          <div className="mt-3 pt-3 border-t space-y-1" style={{ borderColor: "var(--border)" }}>
-            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              <span className="font-semibold">ID:</span> #{lab.id}
-            </p>
-            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              <span className="font-semibold">Tipo:</span> {lab.is_practical ? "Laboratório Prático" : "Laboratório de Informática"}
-            </p>
-            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              <span className="font-semibold">Softwares:</span>{" "}
-              {lab.softwares?.length ? lab.softwares.map(s => s.name).join(", ") : "Nenhum"}
-            </p>
+          <div className="mt-4 pt-4 border-t border-neutral-100 space-y-2 bg-neutral-50/50 p-4 rounded-xl">
+            <p className="text-xs text-neutral-500"><span className="font-bold uppercase tracking-widest text-[9px] mr-2">ID Sistema</span> #{lab.id}</p>
+            <p className="text-xs text-neutral-500"><span className="font-bold uppercase tracking-widest text-[9px] mr-2">Tipo Perfil</span> {lab.is_practical ? "Prático (Componentes)" : "Informática Padrão"}</p>
+            <p className="text-xs text-neutral-500"><span className="font-bold uppercase tracking-widest text-[9px] mr-2">Catálogo SW</span> {lab.softwares?.length ? lab.softwares.map(s => s.name).join(", ") : "Nenhum"}</p>
           </div>
         )}
       </div>
@@ -294,7 +255,7 @@ export function LabsPage() {
   const [filterBlock, setFilterBlock] = useState<string>("all");
   const [newSwName, setNewSwName]   = useState("");
 
-  const canEdit = user?.role === UserRole.PROGEX;
+  const canEdit = user?.role === UserRole.PROGEX || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
   const handleCreate = async (p: any) => {
     try {
@@ -339,75 +300,83 @@ export function LabsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       {ToastComponent}
 
       {/* Modal de form */}
       {(showForm || editTarget) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="w-full max-w-2xl rounded-2xl shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
-            style={{ background: "var(--bg-card)" }}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-100 bg-neutral-50/50">
+              <h3 className="text-xl font-bold text-neutral-900">
                 {editTarget ? "Editar Laboratório" : "Novo Laboratório"}
               </h3>
-              <button onClick={() => { setShowForm(false); setEditTarget(null); }}
-                style={{ color: "var(--text-tertiary)" }}>
+              <button onClick={() => { setShowForm(false); setEditTarget(null); }} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
-            <LabForm
-              initial={editTarget ?? undefined}
-              softwares={softwares ?? []}
-              onSave={editTarget ? handleUpdate : handleCreate}
-              onCancel={() => { setShowForm(false); setEditTarget(null); }}
-            />
+            <div className="p-6 overflow-y-auto custom-scrollbar bg-white">
+              <LabForm
+                initial={editTarget ?? undefined}
+                softwares={softwares ?? []}
+                onSave={editTarget ? handleUpdate : handleCreate}
+                onCancel={() => { setShowForm(false); setEditTarget(null); }}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Laboratórios</h2>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {filtered.length} laboratório{filtered.length !== 1 ? "s" : ""} cadastrado{filtered.length !== 1 ? "s" : ""}
-          </p>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 border border-neutral-200 rounded-3xl shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-neutral-900 rounded-xl flex items-center justify-center shadow-inner shrink-0">
+             <Building2 size={24} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-neutral-900 tracking-tight">Laboratórios</h1>
+            <p className="text-xs font-medium text-neutral-500 mt-1 uppercase tracking-widest">
+              {filtered.length} laboratório{filtered.length !== 1 ? "s" : ""} registrado{filtered.length !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
-        {canEdit && (
-          <button onClick={() => { setShowForm(true); setEditTarget(null); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all"
-            style={{ background: "var(--ucdb-blue)", color: "#fff" }}>
-            <Plus size={16} /> Novo Laboratório
-          </button>
-        )}
-      </div>
+        <div className="flex gap-3">
+          <CustomDropdown 
+            value={filterBlock} 
+            options={[{ value: "all", label: "Todos os Blocos" }, ...BLOCKS.map(b => ({ value: b, label: b }))]} 
+            onChange={setFilterBlock} 
+            icon={Building2} 
+          />
+          {canEdit && (
+            <button onClick={() => { setShowForm(true); setEditTarget(null); }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all bg-neutral-900 text-white hover:bg-neutral-800 shadow-md shadow-neutral-900/20 active:scale-95">
+              <Plus size={16} /> <span className="hidden sm:inline">Cadastrar Lab</span>
+            </button>
+          )}
+        </div>
+      </header>
 
-      {/* Software rápido (só Progex) */}
+      {/* Software rápido (só Progex/Admin) */}
       {canEdit && (
-        <div className="rounded-2xl border p-4" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>
-            Cadastrar novo software
+        <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-neutral-500 mb-4">
+            Módulo Rápido: Cadastrar Novo Software
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input value={newSwName} onChange={e => setNewSwName(e.target.value)}
               placeholder="Ex: AutoCAD 2024"
-              className="flex-1 rounded-xl py-2 px-3 border text-sm"
-              style={{ background: "var(--bg-secondary)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+              className="flex-1 rounded-xl py-2.5 px-4 text-sm bg-neutral-50 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-shadow"
               onKeyDown={e => e.key === "Enter" && (e.preventDefault(), handleAddSoftware())} />
             <button onClick={handleAddSoftware} disabled={!newSwName.trim()}
-              className="px-4 py-2 rounded-xl font-bold text-sm disabled:opacity-40"
-              style={{ background: "var(--ucdb-gold)", color: "var(--ucdb-blue-dark)" }}>
-              Adicionar
+              className="px-6 py-2.5 rounded-xl font-bold text-sm bg-neutral-900 text-white disabled:opacity-40 hover:bg-neutral-800 transition-all shadow-md active:scale-95">
+              Registrar Software
             </button>
           </div>
           {softwares && softwares.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
+            <div className="flex flex-wrap gap-2 mt-4 bg-neutral-50/50 p-4 rounded-2xl border border-neutral-100 max-h-32 overflow-y-auto custom-scrollbar">
               {softwares.map(sw => (
-                <span key={sw.id} className="px-2 py-1 rounded-lg text-[10px] font-semibold"
-                  style={{ background: "var(--info-bg)", color: "var(--info-text)" }}>
-                  {sw.name} {sw.version ? `(${sw.version})` : ""}
+                <span key={sw.id} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white text-neutral-600 border border-neutral-200 shadow-sm">
+                  {sw.name} {sw.version ? <span className="text-neutral-400 font-medium ml-1">v.{sw.version}</span> : ""}
                 </span>
               ))}
             </div>
@@ -415,31 +384,16 @@ export function LabsPage() {
         </div>
       )}
 
-      {/* Filtro por bloco */}
-      <div className="flex gap-2 flex-wrap">
-        {["all", ...BLOCKS].map(b => (
-          <button key={b} onClick={() => setFilterBlock(b)}
-            className="px-4 py-2 rounded-xl text-sm font-semibold border transition-all"
-            style={{
-              background: filterBlock === b ? "var(--ucdb-blue)" : "var(--bg-card)",
-              color: filterBlock === b ? "#fff" : "var(--text-secondary)",
-              borderColor: filterBlock === b ? "var(--ucdb-blue)" : "var(--border)",
-            }}>
-            {b === "all" ? "Todos" : b}
-          </button>
-        ))}
-      </div>
-
-      {loading && <LoadingSpinner label="Carregando laboratórios..." />}
+      {loading && <LoadingSpinner label="Sincronizando infraestrutura..." />}
       {error && <ErrorMessage message={error} onRetry={refetch} />}
 
       {!loading && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.length === 0 ? (
-            <div className="col-span-2 rounded-2xl border p-12 text-center"
-              style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-              <Monitor size={40} className="mx-auto mb-3 opacity-20" style={{ color: "var(--text-tertiary)" }} />
-              <p style={{ color: "var(--text-tertiary)" }}>Nenhum laboratório cadastrado.</p>
+            <div className="col-span-full rounded-3xl bg-white border border-dashed border-neutral-200 p-16 text-center">
+              <Monitor size={48} className="mx-auto mb-4 text-neutral-200" />
+              <p className="text-lg font-bold text-neutral-600">Nenhum laboratório mapeado.</p>
+              <p className="text-sm text-neutral-400 mt-1">Utilize o botão acima para começar a mapear a infraestrutura.</p>
             </div>
           ) : filtered.map(lab => (
             <LabCard key={lab.id} lab={lab} softwares={softwares ?? []}

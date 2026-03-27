@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Monitor, Package, CheckCircle2, X, Scan, ChevronDown, ChevronUp, Building2, Clock, LayoutGrid, CalendarDays } from "lucide-react";
+import { Monitor, Package, CheckCircle2, Check, X, Scan, ChevronDown, ChevronUp, Building2, Clock, LayoutGrid, CalendarDays } from "lucide-react";
 import { Reservation, ReservationStatus, Laboratory } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
@@ -22,12 +22,8 @@ function getDisplayStatus(r: any): {
   const isPastDay = resDate.getTime() < todayDate.getTime();
   const isToday = resDate.getTime() === todayDate.getTime();
 
-  // 1. Se a reserva é de um dia que já passou
-  if (isPastDay) {
-    return { label: "ENCERRADA", variant: "past" };
-  }
+  if (isPastDay) return { label: "ENCERRADA", variant: "past" };
 
-  // 2. Se a reserva é de um dia futuro
   if (!isToday) {
     if (r.status === ReservationStatus.APROVADO || r.status === ReservationStatus.EM_USO) {
       return { label: "CONFIRMADA", variant: "pending" };
@@ -35,7 +31,6 @@ function getDisplayStatus(r: any): {
     return { label: r.status.replace(/_/g, " "), variant: "other" };
   }
 
-  // 3. Se a reserva é HOJE, calculamos os minutos exatos
   const firstBlock = r.timeBlocks?.[0];
   const lastBlock  = r.timeBlocks?.[r.timeBlocks.length - 1];
 
@@ -49,12 +44,8 @@ function getDisplayStatus(r: any): {
       const startMinutes = sh * 60 + sm;
       const endMinutes   = eh * 60 + em;
 
-      if (currentMinutes >= endMinutes) {
-        return { label: "ENCERRADA", variant: "past" };
-      }
-      if (currentMinutes >= startMinutes) {
-        return { label: "EM AULA", variant: "active" };
-      }
+      if (currentMinutes >= endMinutes) return { label: "ENCERRADA", variant: "past" };
+      if (currentMinutes >= startMinutes) return { label: "EM AULA", variant: "active" };
       if (r.status === ReservationStatus.APROVADO || r.status === ReservationStatus.EM_USO) {
         return { label: "CONFIRMADA", variant: "pending" };
       }
@@ -67,8 +58,7 @@ function getDisplayStatus(r: any): {
 }
 
 // ── Modal de Checkout ───────────────────────────────────────────────────────
-interface CheckoutModalProps { reservation: Reservation; onClose: () => void; onDone: () => void; }
-function CheckoutModal({ reservation, onClose, onDone }: CheckoutModalProps) {
+function CheckoutModal({ reservation, onClose, onDone }: { reservation: Reservation; onClose: () => void; onDone: () => void; }) {
   const { showToast, ToastComponent } = useToast();
   const [patrimonyInputs, setPatrimonyInputs] = useState<Record<number, string>>({});
   const [quantities, setQuantities] = useState<Record<number, number>>(() =>
@@ -99,49 +89,75 @@ function CheckoutModal({ reservation, onClose, onDone }: CheckoutModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       {ToastComponent}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
           <div>
-            <h3 className="text-lg font-bold">Check-out de Materiais</h3>
-            <p className="text-xs text-neutral-500">{reservation.user?.full_name} • {reservation.laboratory?.name}</p>
+            <h3 className="text-xl font-bold text-neutral-900">Liberar Materiais</h3>
+            <p className="text-xs font-medium text-neutral-500 mt-1">{reservation.user?.full_name} • {reservation.laboratory?.name}</p>
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={20} /></button>
+          <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
         </div>
-        <div className="space-y-3">
+        
+        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar bg-neutral-50/30">
           {reservation.items.map(item => (
-            <div key={item.id} className="bg-neutral-50 rounded-xl p-3 space-y-2 border border-neutral-100">
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-sm text-neutral-800">{item.model?.name}</p>
-                <span className="text-xs font-bold text-neutral-500 bg-neutral-200 px-2 py-0.5 rounded">Qtd: {item.quantity_requested}</span>
+            <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200/60 transition-all hover:border-neutral-300">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Package size={14} /></div>
+                  <p className="font-bold text-sm text-neutral-900">{item.model?.name}</p>
+                </div>
+                <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2 py-1 rounded-md uppercase tracking-wider">
+                  Qtd. Solicitada: {item.quantity_requested}
+                </span>
               </div>
+              
               <div className="flex gap-2">
-                <input ref={scanTarget === item.id ? scanRef : undefined} value={patrimonyInputs[item.id] ?? ""} onChange={e => setPatrimonyInputs(p => ({ ...p, [item.id]: e.target.value }))} placeholder="Patrimônio (QR Code)..." className="flex-1 bg-white border border-neutral-200 rounded-lg py-1.5 px-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none" />
-                <button onClick={() => setScanTarget(scanTarget === item.id ? null : item.id)} className={`p-1.5 rounded-lg border transition-all ${scanTarget === item.id ? "bg-neutral-900 text-white border-neutral-900" : "bg-white border-neutral-200 hover:bg-neutral-100"}`}><Scan size={18} /></button>
+                <div className="relative flex-1">
+                  <input 
+                    ref={scanTarget === item.id ? scanRef : undefined} 
+                    value={patrimonyInputs[item.id] ?? ""} 
+                    onChange={e => setPatrimonyInputs(p => ({ ...p, [item.id]: e.target.value }))} 
+                    placeholder="Escanear Patrimônio (QR)..." 
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" 
+                  />
+                </div>
+                <button 
+                  onClick={() => setScanTarget(scanTarget === item.id ? null : item.id)} 
+                  className={`px-3 rounded-xl border transition-all flex items-center justify-center ${scanTarget === item.id ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+                  title="Escanear QR Code"
+                >
+                  <Scan size={18} />
+                </button>
               </div>
+              
               {!patrimonyInputs[item.id] && (
-                <div className="flex items-center justify-between bg-white border border-neutral-200 p-1.5 rounded-lg">
-                  <span className="text-xs font-bold text-neutral-400 uppercase px-2">Quantidade</span>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setQuantities(q => ({ ...q, [item.id]: Math.max(1, (q[item.id] ?? 1) - 1) }))} className="w-6 h-6 bg-neutral-100 rounded flex items-center justify-center font-bold text-neutral-600">-</button>
-                    <span className="w-6 text-center font-bold text-sm">{quantities[item.id] ?? item.quantity_requested}</span>
-                    <button onClick={() => setQuantities(q => ({ ...q, [item.id]: (q[item.id] ?? 1) + 1 }))} className="w-6 h-6 bg-neutral-100 rounded flex items-center justify-center font-bold text-neutral-600">+</button>
+                <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 p-2 rounded-xl mt-3">
+                  <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider px-2">Entrega Manual</span>
+                  <div className="flex items-center gap-1 bg-white border border-neutral-200 rounded-lg p-0.5 shadow-sm">
+                    <button onClick={() => setQuantities(q => ({ ...q, [item.id]: Math.max(1, (q[item.id] ?? 1) - 1) }))} className="w-8 h-8 rounded-md flex items-center justify-center font-bold text-neutral-600 hover:bg-neutral-100 active:scale-95 transition-all">-</button>
+                    <span className="w-8 text-center font-bold text-sm text-neutral-900">{quantities[item.id] ?? item.quantity_requested}</span>
+                    <button onClick={() => setQuantities(q => ({ ...q, [item.id]: (q[item.id] ?? 1) + 1 }))} className="w-8 h-8 rounded-md flex items-center justify-center font-bold text-neutral-600 hover:bg-neutral-100 active:scale-95 transition-all">+</button>
                   </div>
                 </div>
               )}
             </div>
           ))}
         </div>
-        <button onClick={handleCheckout} disabled={saving} className="w-full bg-neutral-900 text-white py-3 rounded-xl font-bold disabled:opacity-40 flex items-center justify-center gap-2 mt-4"><Package size={16} /> Confirmar Saída</button>
+        
+        <div className="p-6 bg-white border-t border-neutral-100">
+          <button onClick={handleCheckout} disabled={saving} className="w-full bg-neutral-900 hover:bg-neutral-800 text-white py-3.5 rounded-xl font-bold disabled:opacity-40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-neutral-900/20">
+            {saving ? <LoadingSpinner label="" /> : <><CheckCircle2 size={18} /> Confirmar Liberação</>}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 // ── Modal de Check-in ───────────────────────────────────────────────────────
-interface CheckinModalProps { reservation: Reservation; onClose: () => void; onDone: () => void; }
-function CheckinModal({ reservation, onClose, onDone }: CheckinModalProps) {
+function CheckinModal({ reservation, onClose, onDone }: { reservation: Reservation; onClose: () => void; onDone: () => void; }) {
   const { showToast, ToastComponent } = useToast();
   const [itemStatuses, setItemStatuses] = useState<Record<number, string>>(() => Object.fromEntries(reservation.items.map(i => [i.id, "disponivel"])));
   const [quantities, setQuantities] = useState<Record<number, number>>(() => Object.fromEntries(reservation.items.map(i => [i.id, i.quantity_requested])));
@@ -161,40 +177,127 @@ function CheckinModal({ reservation, onClose, onDone }: CheckinModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       {ToastComponent}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <div><h3 className="text-lg font-bold">Devolução de Materiais</h3><p className="text-xs text-neutral-500">{reservation.laboratory?.name}</p></div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={20} /></button>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+          <div>
+            <h3 className="text-xl font-bold text-neutral-900">Devolução de Materiais</h3>
+            <p className="text-xs font-medium text-neutral-500 mt-1">{reservation.user?.full_name} • {reservation.laboratory?.name}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
         </div>
-        <div className="space-y-3">
+        
+        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar bg-neutral-50/30">
           {reservation.items.map(item => (
-            <div key={item.id} className="bg-neutral-50 rounded-xl p-3 space-y-3 border border-neutral-100">
-              <p className="font-bold text-sm text-neutral-800">{item.model?.name}</p>
-              <div className="flex gap-2">
-                {[{ value: "disponivel", label: "OK", color: "bg-emerald-100 text-emerald-700 border-emerald-200" }, { value: "manutencao", label: "Avaria", color: "bg-amber-100 text-amber-700 border-amber-200" }].map(opt => (
-                  <button key={opt.value} onClick={() => setItemStatuses(s => ({ ...s, [item.id]: opt.value }))} className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${itemStatuses[item.id] === opt.value ? opt.color : "bg-white border-neutral-200 text-neutral-500"}`}>{opt.label}</button>
+            <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200/60 transition-all hover:border-neutral-300">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><RotateCcw size={14} /></div>
+                <p className="font-bold text-sm text-neutral-900">{item.model?.name}</p>
+              </div>
+              
+              <div className="flex gap-2 mb-3">
+                {[{ value: "disponivel", label: "Perfeito Estado", color: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" }, { value: "manutencao", label: "Avariado", color: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100" }].map(opt => (
+                  <button key={opt.value} onClick={() => setItemStatuses(s => ({ ...s, [item.id]: opt.value }))} 
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] ${itemStatuses[item.id] === opt.value ? opt.color + " shadow-sm ring-1 ring-black/5" : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"}`}>
+                    {opt.label}
+                  </button>
                 ))}
               </div>
-              <div className="flex items-center justify-between bg-white border border-neutral-200 p-1.5 rounded-lg">
-                <span className="text-xs font-bold text-neutral-400 uppercase px-2">Qtd Devolvida</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setQuantities(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 1) - 1) }))} className="w-6 h-6 bg-neutral-100 rounded flex items-center justify-center font-bold text-neutral-600">-</button>
-                  <span className="w-6 text-center font-bold text-sm">{quantities[item.id]}</span>
-                  <button onClick={() => setQuantities(q => ({ ...q, [item.id]: (q[item.id] ?? 0) + 1 }))} className="w-6 h-6 bg-neutral-100 rounded flex items-center justify-center font-bold text-neutral-600">+</button>
+              
+              <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 p-2 rounded-xl">
+                <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider px-2">Qtd Devolvida</span>
+                <div className="flex items-center gap-1 bg-white border border-neutral-200 rounded-lg p-0.5 shadow-sm">
+                  <button onClick={() => setQuantities(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 1) - 1) }))} className="w-8 h-8 rounded-md flex items-center justify-center font-bold text-neutral-600 hover:bg-neutral-100 active:scale-95 transition-all">-</button>
+                  <span className="w-8 text-center font-bold text-sm text-neutral-900">{quantities[item.id]}</span>
+                  <button onClick={() => setQuantities(q => ({ ...q, [item.id]: (q[item.id] ?? 0) + 1 }))} className="w-8 h-8 rounded-md flex items-center justify-center font-bold text-neutral-600 hover:bg-neutral-100 active:scale-95 transition-all">+</button>
                 </div>
               </div>
             </div>
           ))}
         </div>
-        <button onClick={handleCheckin} disabled={saving} className="w-full bg-neutral-900 text-white py-3 rounded-xl font-bold disabled:opacity-40 flex items-center justify-center gap-2 mt-4"><CheckCircle2 size={16} /> Confirmar Devolução</button>
+        
+        <div className="p-6 bg-white border-t border-neutral-100">
+          <button onClick={handleCheckin} disabled={saving} className="w-full bg-neutral-900 hover:bg-neutral-800 text-white py-3.5 rounded-xl font-bold disabled:opacity-40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-neutral-900/20">
+            {saving ? <LoadingSpinner label="" /> : <><CheckCircle2 size={18} /> Confirmar Devolução</>}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Linha Compacta de Reserva (Com Sinalizadores) ───────────────────────────
+import { RotateCcw } from "lucide-react"; 
+
+// ── Dropdown Customizado (Substitui o <select> nativo) ──────────────────────
+function CustomDropdown({
+  value,
+  options,
+  onChange,
+  icon: Icon,
+  prefix = ""
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (val: string) => void;
+  icon: React.ElementType;
+  prefix?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const selectedLabel = options.find(o => o.value === value)?.label || value;
+
+  return (
+    <div className="relative w-full sm:w-auto" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full sm:w-auto flex items-center justify-between gap-3 bg-white border border-neutral-200 text-neutral-800 py-2.5 px-3 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm hover:bg-neutral-50 transition-all active:scale-[0.98]"
+      >
+        <div className="flex items-center gap-2">
+          <Icon size={14} className="text-neutral-500" />
+          <span className="truncate max-w-[140px] text-left">{prefix}{selectedLabel}</span>
+        </div>
+        <ChevronDown size={14} className={`text-neutral-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 w-full sm:min-w-[180px] mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] z-50 overflow-hidden py-1.5">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex items-center justify-between ${
+                  value === opt.value
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                }`}
+              >
+                <span className="truncate pr-2">{prefix}{opt.label}</span>
+                {value === opt.value && <Check size={14} className="text-blue-600 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Linha Compacta de Reserva (Resolução do problema de enquadramento) ──────
 function CompactReservationRow({ r, setCheckout, setCheckin }: { r: any; setCheckout: any; setCheckin: any }) {
   const hasMaterials = r.items && r.items.length > 0;
   const timeStr = r.timeBlocks?.join(" | ") || "—";
@@ -203,19 +306,26 @@ function CompactReservationRow({ r, setCheckout, setCheckin }: { r: any; setChec
   const canCheckout = r.status === ReservationStatus.APROVADO && displayStatus.variant !== "past" && hasMaterials;
   const canCheckin  = r.status === ReservationStatus.EM_USO   && displayStatus.variant !== "past" && hasMaterials;
 
-  let dotColor = "bg-neutral-300"; 
+  let dotColor = "bg-neutral-200"; 
+  let dotGlow = "";
   let dotTitle = "Encerrada / Vago";
+  let textColor = "text-neutral-500";
 
   if (displayStatus.variant !== "past") {
     if (canCheckout) {
-      dotColor = "bg-yellow-400"; 
+      dotColor = "bg-amber-400"; 
+      dotGlow = "shadow-[0_0_8px_rgba(251,191,36,0.6)] animate-pulse";
       dotTitle = "Aguardando liberação de material";
+      textColor = "text-amber-700";
     } else if (canCheckin) {
       dotColor = "bg-blue-500"; 
+      dotGlow = "shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse";
       dotTitle = "Aguardando devolução de material";
+      textColor = "text-blue-700";
     } else {
       dotColor = "bg-emerald-500"; 
       dotTitle = "Em andamento / Confirmada";
+      textColor = "text-emerald-700";
     }
   }
 
@@ -229,19 +339,28 @@ function CompactReservationRow({ r, setCheckout, setCheckin }: { r: any; setChec
   return (
     <div 
       onClick={isClickable ? handleClick : undefined}
-      className={`py-2 border-t border-neutral-100 transition-colors ${
-        isClickable ? "cursor-pointer hover:bg-neutral-100 rounded-lg px-2 -mx-2" : "px-2 -mx-2"
+      className={`p-3 border border-neutral-100 transition-all mb-2 last:mb-0 rounded-xl ${
+        isClickable ? "cursor-pointer bg-white hover:border-neutral-300 hover:shadow-sm active:scale-[0.99]" : "bg-neutral-50/50"
       }`}
       title={isClickable ? "Clique para gerenciar materiais desta aula" : undefined}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-bold text-neutral-900 truncate">{timeStr}</p>
-        <div className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${dotColor}`} title={dotTitle} />
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <p className={`text-sm font-bold leading-snug ${displayStatus.variant === "past" ? "text-neutral-400" : "text-neutral-900"}`}>
+          {timeStr}
+        </p>
+        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+          {isClickable && <span className={`text-[9px] font-bold uppercase tracking-wider ${textColor}`}>{canCheckout ? "Liberar" : "Devolver"}</span>}
+          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor} ${dotGlow}`} title={dotTitle} />
+        </div>
       </div>
-      <div className="flex items-center justify-between mt-0.5">
-        <p className="text-xs text-neutral-500 truncate">{r.user?.full_name}</p>
+      <div className="flex items-center justify-between gap-2 mt-1">
+        <p className={`text-xs font-medium truncate ${displayStatus.variant === "past" ? "text-neutral-400" : "text-neutral-600"}`}>
+          {r.user?.full_name}
+        </p>
         {hasMaterials && (
-          <Package size={12} className="text-neutral-400 shrink-0" title={`${r.items.length} pacote(s) de material atrelado`} />
+          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${displayStatus.variant === "past" ? "bg-neutral-100 text-neutral-400" : "bg-neutral-100 text-neutral-600"}`} title={`${r.items.length} pacote(s) de material atrelado`}>
+            <Package size={10} /> {r.items.length}
+          </div>
         )}
       </div>
     </div>
@@ -267,19 +386,16 @@ export function DailyPage() {
   const [checkinTarget,  setCheckinTarget]  = useState<Reservation | null>(null);
   const [expandedLabs,   setExpandedLabs]   = useState<Record<string, boolean>>({});
   
-  // 1. Estado do Dia da Semana (Inicia com o dia de hoje)
   const [weekdayFilter, setWeekdayFilter] = useState<string>(() => {
     const today = new Date().getDay();
-    return today === 0 ? "1" : today.toString(); // Se for domingo(0), pula pra segunda(1)
+    return today === 0 ? "1" : today.toString(); 
   });
 
   const [shiftFilter, setShiftFilter] = useState<"all" | "manha" | "tarde" | "noite">("all");
   const [blockFilter, setBlockFilter] = useState<string>("all");
 
   const labKey = (lab: Laboratory) => `lab-${lab.id ?? lab.name}`;
-
-  const toggleLab = (key: string) =>
-    setExpandedLabs(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleLab = (key: string) => setExpandedLabs(prev => ({ ...prev, [key]: !prev[key] }));
 
   const availableBlocks = useMemo(() => {
     if (!data) return [];
@@ -288,11 +404,9 @@ export function DailyPage() {
     return Array.from(blocks).sort();
   }, [data]);
 
-  // 2. CÉREBRO: Filtragem em Cascata (Dia -> Agrupamento -> Turno -> Bloco)
   const groupedLabs = useMemo(() => {
     if (!data) return [];
 
-    // Filtra rigidamente pela DATA selecionada antes de montar a interface
     const dataFilteredByDay = data.filter((res: any) => {
       const resDate = new Date(res.date + "T00:00:00");
       return resDate.getDay().toString() === weekdayFilter;
@@ -350,10 +464,7 @@ export function DailyPage() {
     });
 
     resultList = resultList.sort((a, b) => a.lab.name.localeCompare(b.lab.name));
-
-    if (blockFilter !== "all") {
-      resultList = resultList.filter(g => g.lab.block === blockFilter);
-    }
+    if (blockFilter !== "all") resultList = resultList.filter(g => g.lab.block === blockFilter);
 
     return resultList;
   }, [data, weekdayFilter, shiftFilter, blockFilter]);
@@ -390,186 +501,170 @@ export function DailyPage() {
   const hasActiveBlockFilter = blockFilter !== "all";
 
   return (
-    <div className="space-y-4 pb-8 w-full px-2 md:px-0">
+    <div className="space-y-6 pb-12 w-full px-2 md:px-0">
       {ToastComponent}
       {checkoutTarget && <CheckoutModal reservation={checkoutTarget} onClose={() => setCheckoutTarget(null)} onDone={refetch} />}
       {checkinTarget  && <CheckinModal  reservation={checkinTarget}  onClose={() => setCheckinTarget(null)}  onDone={refetch} />}
 
-      {/* ── Barra Superior (Filtro de Dia da Semana) ─────────────────────────── */}
-      <div className="bg-white border border-neutral-200 rounded-xl shadow-sm sticky top-0 z-10 overflow-hidden">
-        
-        {/* Linha 1: Título e Filtro de Dias da Semana */}
-        <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 px-5 py-4 border-b border-neutral-100 bg-neutral-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-neutral-900 flex items-center justify-center shrink-0">
-              <LayoutGrid size={20} className="text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-neutral-900 leading-tight">Agenda DTI</h2>
-              <p className="text-[11px] text-neutral-400 uppercase tracking-widest mt-0.5">
-                Controle Operacional
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full xl:w-auto">
-            <CalendarDays size={16} className="text-neutral-400 shrink-0 hidden md:block mr-1" />
-            {WEEKDAYS.map(day => (
-              <button
-                key={day.value}
-                onClick={() => setWeekdayFilter(day.value)}
-                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${
-                  weekdayFilter === day.value
-                    ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                    : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50"
-                }`}
-              >
-                {day.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Linha 2: Turnos, Blocos e Legenda */}
-        <div className="flex flex-col 3xl:flex-row 2xl:items-center justify-between gap-4 px-5 py-3">
+      {/* ── Barra Superior Fixa (Header & Filtros) com Agrupamento Dropdown ─ */}
+      <div className="sticky top-0 z-20 -mx-2 md:mx-0 px-2 md:px-0 pt-2 pb-4 bg-[#f1f4f8]/80 backdrop-blur-md">
+        <div className="bg-white border border-neutral-200/80 rounded-2xl shadow-sm ring-1 ring-black/5">
           
-          <div className="flex flex-col md:flex-row md:items-center gap-4 w-full 2xl:w-auto overflow-x-auto no-scrollbar">
-            {/* Filtros de Turno */}
-            <div className="flex items-center gap-2 shrink-0">
-              <Clock size={14} className="text-neutral-400 shrink-0" />
-              {[{ id: "all", label: "Geral" }, { id: "manha", label: "Manhã" }, { id: "tarde", label: "Tarde" }, { id: "noite", label: "Noite" }].map(opt => (
-                <button
-                  key={opt.id}
-                  onClick={() => setShiftFilter(opt.id as any)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all ${
-                    shiftFilter === opt.id ? "bg-neutral-200 text-neutral-800" : "bg-transparent text-neutral-500 hover:bg-neutral-100"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          <div className="flex flex-col lg:flex-row justify-between gap-4 px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 rounded-t-2xl">
+            
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-neutral-900 flex items-center justify-center shrink-0 shadow-inner">
+                <LayoutGrid size={20} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-neutral-900 leading-tight">Agenda de Aulas</h2>
+                <p className="text-[11px] text-neutral-500 uppercase tracking-widest mt-0.5 font-semibold">
+                  Monitoramento em Tempo Real
+                </p>
+              </div>
             </div>
 
-            <div className="w-px h-6 bg-neutral-200 mx-2 hidden md:block"></div>
+            {/* Grupo de Filtros com Componente Customizado (100% Nativo, Estilo Moderno) */}
+            <div className="flex flex-wrap items-center gap-3">
+              
+              {/* Dia da Semana */}
+              <CustomDropdown
+                value={weekdayFilter}
+                options={WEEKDAYS.map(day => ({ value: String(day.value), label: day.label }))}
+                onChange={setWeekdayFilter}
+                icon={CalendarDays}
+              />
 
-            {/* Filtros de Bloco */}
-            {availableBlocks.length > 0 && (
-              <div className="flex items-center gap-2 shrink-0">
-                <Building2 size={14} className="text-neutral-400 shrink-0" />
-                <button
-                  onClick={() => setBlockFilter("all")}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all ${
-                    blockFilter === "all" ? "bg-neutral-200 text-neutral-800" : "bg-transparent text-neutral-500 hover:bg-neutral-100"
-                  }`}
-                >
-                  Todos
-                </button>
-                {availableBlocks.map(block => (
-                  <button
-                    key={block}
-                    onClick={() => setBlockFilter(block)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all ${
-                      blockFilter === block ? "bg-neutral-200 text-neutral-800" : "bg-transparent text-neutral-500 hover:bg-neutral-100"
-                    }`}
-                  >
-                    {block}
-                  </button>
-                ))}
-                {hasActiveBlockFilter && (
-                  <button onClick={() => setBlockFilter("all")} className="shrink-0 flex items-center gap-1 text-xs font-bold text-neutral-400 hover:text-neutral-700 transition-colors ml-2">
-                    <X size={14} /> Limpar
-                  </button>
-                )}
-              </div>
-            )}
+              {/* Turnos */}
+              <CustomDropdown
+                value={shiftFilter}
+                options={[
+                  { value: "all", label: "Todos" },
+                  { value: "manha", label: "Manhã" },
+                  { value: "tarde", label: "Tarde" },
+                  { value: "noite", label: "Noite" }
+                ]}
+                onChange={setShiftFilter as any}
+                icon={Clock}
+                prefix="Turno: "
+              />
+
+              {/* Blocos */}
+              {availableBlocks.length > 0 && (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <CustomDropdown
+                    value={blockFilter}
+                    options={[
+                      { value: "all", label: "Todos" },
+                      ...availableBlocks.map(b => ({ value: b, label: b }))
+                    ]}
+                    onChange={setBlockFilter}
+                    icon={Building2}
+                    prefix="Bloco: "
+                  />
+                  {hasActiveBlockFilter && (
+                    <button 
+                      onClick={() => setBlockFilter("all")} 
+                      className="shrink-0 flex items-center justify-center px-3 bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 rounded-xl transition-colors shadow-sm" 
+                      title="Remover filtro de bloco"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Legenda */}
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pt-2 2xl:pt-0 border-t 2xl:border-none border-neutral-100">
-            <div className="flex items-center gap-1.5 shrink-0"><div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-sm" /> <span className="text-[10px] font-bold text-neutral-500 uppercase">Liberar Mat.</span></div>
-            <div className="flex items-center gap-1.5 shrink-0"><div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm" /> <span className="text-[10px] font-bold text-neutral-500 uppercase">Devolver Mat.</span></div>
-            <div className="flex items-center gap-1.5 shrink-0"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /> <span className="text-[10px] font-bold text-neutral-500 uppercase">Em Aula/Conf.</span></div>
-            <div className="flex items-center gap-1.5 shrink-0"><div className="w-2.5 h-2.5 rounded-full bg-neutral-300 shadow-sm" /> <span className="text-[10px] font-bold text-neutral-500 uppercase">Encerrada</span></div>
+          <div className="bg-white px-6 py-3.5 flex flex-wrap items-center gap-5 text-[10px] font-bold text-neutral-500 uppercase tracking-widest rounded-b-2xl">
+             <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm" /> Liberar Mat.</div>
+             <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm" /> Devolver Mat.</div>
+             <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /> Em Aula / Conf.</div>
+             <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-neutral-200 shadow-sm" /> Encerrada / Vago</div>
           </div>
         </div>
       </div>
 
-      {loading && <LoadingSpinner label="Buscando matriz..." />}
+      {loading && <LoadingSpinner label="Sincronizando grade..." />}
       {error   && <ErrorMessage message={error} onRetry={refetch} />}
 
       {!loading && !error && groupedLabs.length === 0 && (
-        <div className="text-center py-20 text-neutral-400">
-          <Monitor size={48} className="mx-auto mb-4 opacity-30" />
-          <p className="text-base font-bold text-neutral-500">Nenhum laboratório encontrado</p>
-          <p className="text-sm mt-1">
-            Não há aulas previstas para os filtros selecionados.
+        <div className="text-center py-24 bg-white border border-dashed border-neutral-200 rounded-3xl">
+          <Monitor size={48} className="mx-auto mb-4 text-neutral-200" />
+          <p className="text-lg font-bold text-neutral-600">Nenhuma aula programada</p>
+          <p className="text-sm text-neutral-400 mt-1">
+            Não há registros para a combinação de filtros selecionada.
           </p>
         </div>
       )}
 
       {/* ── Grid de Laboratórios ─────────────────────────────────────────── */}
       {!loading && !error && groupedLabs.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mt-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 items-start">
           {groupedLabs.map(({ lab, reservations }) => {
             const { primary, others } = getPrimaryAndOthers(reservations);
             const key = labKey(lab);
             const isExpanded = expandedLabs[key];
 
             return (
-              <div key={key} className="relative">
-                <div className={`bg-white border border-neutral-200 rounded-2xl shadow-sm flex flex-col transition-all duration-300 ${isExpanded ? "ring-2 ring-neutral-900 border-neutral-900 z-40 relative" : "hover:shadow-md"}`}>
-                  <div className="px-4 py-3 border-b border-neutral-100 flex items-center gap-3 rounded-t-2xl bg-neutral-50">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center shrink-0 shadow-sm">
-                      <Monitor size={20} className="text-neutral-700" />
+              <div key={key} className={`relative ${isExpanded ? "z-40" : "z-0"}`}>
+                <div className={`bg-white border flex flex-col transition-all duration-300 ${
+                  isExpanded 
+                    ? "border-neutral-900 shadow-xl rounded-t-2xl rounded-b-none border-b-0" 
+                    : "border-neutral-200/80 shadow-sm hover:shadow-md hover:border-neutral-300 rounded-2xl"
+                }`}>
+                  
+                  {/* Lab Header */}
+                  <div className={`px-4 py-4 border-b border-neutral-100 flex items-center gap-3 bg-neutral-50/50 ${isExpanded ? "rounded-t-2xl" : "rounded-t-2xl"}`}>
+                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200/60 flex items-center justify-center shrink-0 shadow-sm">
+                      <Monitor size={18} className="text-neutral-700" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-sm md:text-base text-neutral-800 truncate">{lab.name}</h3>
-                      <span className="flex items-center gap-1 text-[11px] md:text-xs font-semibold text-neutral-500 mt-0.5 truncate">
+                      <h3 className="font-bold text-base text-neutral-900 truncate">{lab.name}</h3>
+                      <span className="flex items-center gap-1 text-xs font-semibold text-neutral-500 mt-0.5 truncate">
                         <Building2 size={12} />
-                        {lab.block} • Sala {lab.room_number}
+                        {lab.block} • Sl. {lab.room_number}
                       </span>
                     </div>
                   </div>
 
-                  <div className="p-3">
+                  {/* Primary Reservation */}
+                  <div className="p-3 bg-white">
                     <CompactReservationRow r={primary} setCheckout={setCheckoutTarget} setCheckin={setCheckinTarget} />
                   </div>
 
+                  {/* Toggle Others */}
                   {others.length > 0 && (
                     <button
                       onClick={() => toggleLab(key)}
-                      className={`w-full py-2.5 flex items-center justify-center gap-1 text-xs font-bold transition-colors rounded-b-2xl border-t ${
+                      className={`w-full py-3 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
                         isExpanded 
-                          ? "bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800" 
-                          : "border-neutral-100 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                          ? "bg-neutral-900 text-white border-none rounded-b-none" 
+                          : "bg-neutral-50 border-t border-neutral-100 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-b-2xl"
                       }`}
                     >
                       {isExpanded
-                        ? <><ChevronUp size={14} /> Fechar grade de horários</>
+                        ? <><ChevronUp size={14} /> Fechar grade diária</>
                         : <><ChevronDown size={14} /> Ver {others.length} aula(s) seguintes</>
                       }
                     </button>
                   )}
                 </div>
 
+                {/* Dropdown Others (Fusão Visual Perfeita) */}
                 <div 
-                  className={`absolute top-full left-0 right-0 z-30 pt-2 transition-all duration-300 ease-out origin-top ${
-                    isExpanded ? "opacity-100 scale-y-100 pointer-events-auto" : "opacity-0 scale-y-95 pointer-events-none"
+                  className={`absolute top-full left-0 right-0 transition-all duration-200 ease-out origin-top ${
+                    isExpanded ? "opacity-100 scale-y-100 pointer-events-auto z-30" : "opacity-0 scale-y-95 pointer-events-none -z-10"
                   }`}
                 >
-                  <div className="bg-white border border-neutral-200 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/5">
-                    <div className="px-3 py-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                  <div className="bg-white border border-neutral-900 border-t-0 rounded-b-2xl shadow-[0_15px_30px_-5px_rgba(0,0,0,0.15)] overflow-hidden">
+                    <div className="bg-neutral-50 border-b border-neutral-100 px-4 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
+                      Próximas Aulas
+                    </div>
+                    <div className="p-3 max-h-[300px] overflow-y-auto custom-scrollbar space-y-1">
                       {others.map((r, i) => (
                         <CompactReservationRow key={i} r={r} setCheckout={setCheckoutTarget} setCheckin={setCheckinTarget} />
                       ))}
-                    </div>
-                    <div className="bg-neutral-50 border-t border-neutral-100 p-2">
-                       <button
-                         onClick={() => toggleLab(key)}
-                         className="w-full py-2 bg-white border border-neutral-200 rounded-xl flex items-center justify-center gap-1 text-xs font-bold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors shadow-sm"
-                       >
-                         <ChevronUp size={14} /> Recolher
-                       </button>
                     </div>
                   </div>
                 </div>

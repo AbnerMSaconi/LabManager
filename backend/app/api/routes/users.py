@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..deps import get_db, RoleChecker
 from ...models.base_models import User, UserRole
@@ -8,14 +9,14 @@ from ...core.security import get_password_hash
 
 router = APIRouter(prefix="/api/v1/users", tags=["usuários"])
 
-MANAGERS = [UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR]
+MANAGERS = [UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
 
 @router.get("/")
 async def list_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
-    users = db.query(User).all()
+    users = db.query(User).filter(User.deleted_at == None).all()
     return [
         {
             "id": u.id,
@@ -74,13 +75,14 @@ async def update_user(
 async def deactivate_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Você não pode desativar sua própria conta.")
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id, User.deleted_at == None).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     user.is_active = False
+    user.deleted_at = func.now()
     db.commit()
-    return {"message": "Usuário desativado."}
+    return {"message": "Usuário movido para a quarentena."}

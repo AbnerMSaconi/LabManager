@@ -6,16 +6,36 @@ import uuid
 from pydantic import BaseModel
 
 from ..deps import get_db, RoleChecker, get_current_user
-from .sse import broadcast
+from .sse import sse_manager
 from ...models.base_models import (
     Reservation, ReservationItem, ReservationSlot,
     ReservationStatus, User, UserRole, ItemModel, Laboratory
 )
 from ...schemas.reservation_schemas import (
-    ReservationCreate, ReservationReview, AddReservationItemsRequest
+    ReservationCreate, ReservationReview, AddReservationItemsRequest, ReservationUpdate
 )
 
 router = APIRouter(prefix="/api/v1/reservations", tags=["reservas"])
+
+# Roles que recebem notificações de reserva além do professor dono
+_STAFF_ROLES = [
+    UserRole.DTI_ESTAGIARIO.value,
+    UserRole.DTI_TECNICO.value,
+    UserRole.PROGEX.value,
+]
+
+
+async def _notify_reservation(db: Session, professor_id: int, event_type: str, payload: dict) -> None:
+    """Envia evento SSE apenas para o professor dono da reserva + todos DTI/PROGEX ativos.
+    Inclui 'professor_id' no payload para que o frontend possa validar por conta própria."""
+    staff_ids = [
+        row[0] for row in db.query(User.id).filter(
+            User.role.in_(_STAFF_ROLES),
+            User.is_active == True,
+        ).all()
+    ]
+    recipient_ids = list({professor_id} | set(staff_ids))
+    await sse_manager.send_to_users(recipient_ids, event_type, {**payload, "professor_id": professor_id})
 
 
 class GroupSwapRequest(BaseModel):
@@ -69,7 +89,7 @@ def _find_approval_conflict(
 async def create_reservation(
     reservation_in: ReservationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROFESSOR, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.PROFESSOR, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     if not reservation_in.dates:
         raise HTTPException(status_code=400, detail="É necessário informar pelo menos uma data.")
@@ -123,7 +143,7 @@ async def create_reservation(
         created_ids.append(new_reservation.id)
 
     db.commit()
-    await broadcast("RESERVATION_CREATED", {"ids": created_ids, "group_id": group_id, "lab_id": reservation_in.lab_id})
+    await _notify_reservation(db, current_user.id, "RESERVATION_CREATED", {"ids": created_ids, "group_id": group_id, "lab_id": reservation_in.lab_id})
     return {
         "message": f"{len(created_ids)} reserva(s) enviada(s) com sucesso.",
         "group_id": group_id,
@@ -134,7 +154,7 @@ async def create_reservation(
 @router.get("/pending")
 async def list_pending_reservations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     status_list = [
         ReservationStatus.PENDENTE.value,
@@ -154,7 +174,7 @@ async def list_pending_reservations(
 @router.get("/awaiting-software")
 async def list_awaiting_software(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     return db.query(Reservation).options(
         joinedload(Reservation.slots),
@@ -169,7 +189,7 @@ async def list_awaiting_software(
 @router.get("/today")
 async def list_today_reservations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     from datetime import date
     status_list = [
@@ -255,7 +275,7 @@ async def list_reservations_by_date(
 @router.get("/")
 async def list_all_reservations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     return db.query(Reservation).options(
         joinedload(Reservation.slots),
@@ -270,7 +290,7 @@ async def review_reservation(
     reservation_id: int,
     review: ReservationReview,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
     if not reservation:
@@ -319,7 +339,7 @@ async def review_reservation(
         reservation.approval_notes = review.approval_notes
 
     db.commit()
-    await broadcast("RESERVATION_UPDATED", {"id": reservation_id, "status": review.status.value})
+    await _notify_reservation(db, reservation.user_id, "RESERVATION_UPDATED", {"id": reservation_id, "status": review.status.value})
     return {"message": f"Reserva {reservation_id} atualizada para '{review.status.value}'."}
 
 
@@ -328,7 +348,7 @@ async def review_reservation_group(
     group_id: str,
     review: ReservationReview,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR]))
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     reservations = db.query(Reservation).filter(Reservation.group_id == group_id).all()
     if not reservations:
@@ -382,7 +402,8 @@ async def review_reservation_group(
             updated_count += 1
 
     db.commit()
-    await broadcast("RESERVATION_UPDATED", {"group_id": group_id, "status": review.status.value, "count": updated_count})
+    professor_id = reservations[0].user_id if reservations else 0
+    await _notify_reservation(db, professor_id, "RESERVATION_UPDATED", {"group_id": group_id, "status": review.status.value, "count": updated_count})
     return {"message": f"{updated_count} reservas do lote atualizadas para '{review.status.value}'."}
 
 
@@ -427,7 +448,8 @@ async def swap_reservation_group(
         count += 1
 
     db.commit()
-    await broadcast("RESERVATION_UPDATED", {"group_id": group_id, "action": "swap", "count": count})
+    professor_id = reservations[0].user_id if reservations else 0
+    await _notify_reservation(db, professor_id, "RESERVATION_UPDATED", {"group_id": group_id, "action": "swap", "count": count})
     return {"message": f"{count} reservas futuras deste semestre foram transferidas com sucesso."}
 
 
@@ -481,5 +503,73 @@ async def add_items_to_reservation(
                 quantity_requested=item_in.quantity_requested,
             ))
     db.commit()
-    await broadcast("RESERVATION_UPDATED", {"id": reservation_id, "action": "items_added"})
+    await _notify_reservation(db, current_user.id, "RESERVATION_UPDATED", {"id": reservation_id, "action": "items_added"})
     return {"message": "Materiais adicionados à reserva com sucesso."}
+
+@router.put("/{reservation_id}", tags=["reservas"])
+async def update_reservation(
+    reservation_id: int,
+    payload: ReservationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+):
+    reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reserva não encontrada.")
+
+    target_lab_id = payload.lab_id if payload.lab_id is not None else reservation.lab_id
+    target_date = payload.date if payload.date is not None else reservation.date
+    target_slots = payload.slot_ids if payload.slot_ids is not None else [s.id for s in reservation.slots]
+
+    # Regra de Conflito: DTI tem prioridade máxima.
+    blocking_statuses = [
+        ReservationStatus.APROVADO.value, 
+        ReservationStatus.AGUARDANDO_SOFTWARE.value, 
+        ReservationStatus.EM_USO.value, 
+        ReservationStatus.APROVADO_COM_RESSALVAS.value
+    ]
+    
+    conflict = db.query(Reservation).join(ReservationSlot).filter(
+        Reservation.id != reservation_id,
+        Reservation.lab_id == target_lab_id,
+        Reservation.date == target_date,
+        Reservation.status.in_(blocking_statuses),
+        ReservationSlot.slot_id.in_(target_slots)
+    ).first()
+
+    if conflict:
+        raise HTTPException(status_code=409, detail=f"Conflito! O horário desejado já está ocupado pela reserva confirmada #{conflict.id}.")
+
+    # Executa a alteração
+    if payload.lab_id is not None:
+        reservation.lab_id = payload.lab_id
+    if payload.date is not None:
+        reservation.date = payload.date
+    if payload.slot_ids is not None:
+        db.query(ReservationSlot).filter(ReservationSlot.reservation_id == reservation_id).delete()
+        for slot_id in payload.slot_ids:
+            db.add(ReservationSlot(reservation_id=reservation_id, slot_id=slot_id))
+
+    db.commit()
+    # CORREÇÃO AQUI: Passando db e reservation.user_id para a notificação não dar erro 500
+    await _notify_reservation(db, reservation.user_id, "RESERVATION_UPDATED", {"id": reservation_id, "action": "updated"})
+    return {"message": "Reserva atualizada com sucesso."}
+
+
+@router.delete("/{reservation_id}", tags=["reservas"])
+async def delete_reservation(
+    reservation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+):
+    reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reserva não encontrada.")
+
+    professor_id = reservation.user_id
+    db.query(ReservationSlot).filter(ReservationSlot.reservation_id == reservation_id).delete()
+    db.query(ReservationItem).filter(ReservationItem.reservation_id == reservation_id).delete()
+    db.delete(reservation)
+    db.commit()
+    await _notify_reservation(db, professor_id, "RESERVATION_UPDATED", {"id": reservation_id, "action": "deleted"})
+    return {"message": f"Reserva {reservation_id} excluída com sucesso."}

@@ -9,3 +9,4 @@ passlib==1.7.4
 bcrypt==4.0.1
 python-jose[cryptography]==3.5.0
 python-multipart==0.0.22
+apscheduler==3.10.4

@@ -9,8 +9,8 @@ from ...schemas.reservation_schemas import TicketCreate, TicketResolve
 
 router = APIRouter(prefix="/api/v1/maintenance", tags=["manutenção"])
 
-MANAGERS = [UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR]
-ALL_DTI   = [UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR]
+MANAGERS = [UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
+ALL_DTI   = [UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
 
 @router.get("/")
 async def list_tickets(

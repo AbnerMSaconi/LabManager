@@ -22,6 +22,11 @@ export interface ReviewPayload {
   approval_notes?: string;
 }
 
+export interface UpdateReservationPayload {
+  lab_id?: number;
+  date?: string;
+  slot_ids?: number[];
+}
 
 export const reservationsApi = {
   listMy: () => api.get<Reservation[]>("/api/v1/reservations/my"),
@@ -30,6 +35,8 @@ export const reservationsApi = {
   listByDate: (date: string) => api.get<Reservation[]>(`/api/v1/reservations/date/${date}`),
   listAwaitingSoftware: () => api.get<Reservation[]>("/api/v1/reservations/awaiting-software"),
   create: (payload: CreateReservationPayload) => api.post<CreateReservationResponse>("/api/v1/reservations", payload),
+  update: (id: number, payload: UpdateReservationPayload) => api.put<{ message: string }>(`/api/v1/reservations/${id}`, payload),
+  delete: (id: number) => api.delete<{ message: string }>(`/api/v1/reservations/${id}`),
   review: (id: number, payload: ReviewPayload) => api.patch<{ message: string }>(`/api/v1/reservations/${id}/review`, payload),
   reviewGroup: (groupId: string, payload: ReviewPayload) => 
     api.patch<{ message: string }>(`/api/v1/reservations/group/${groupId}/review`, payload),

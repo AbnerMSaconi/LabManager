@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Calendar, Package, Monitor, ChevronRight, Map, Building2, LayoutGrid, Wrench, Users } from "lucide-react";
+import { Calendar, Package, Monitor, ChevronRight, Map, Building2, LayoutGrid, Wrench, Users, Filter } from "lucide-react";
 import { UserRole, ReservationStatus, Reservation } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
@@ -7,6 +7,7 @@ import { reservationsApi } from "../api/reservationsApi";
 import { labsApi } from "../api/labsApi";
 import { maintenanceApi } from "../api/maintenanceApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
+import { CustomDropdown } from "./reservationShared";
 
 const STATUS_STYLES: Record<string, string> = {
   [ReservationStatus.APROVADO]:           "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -73,42 +74,31 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
   if (labsLoading || todayLoading) return <LoadingSpinner label="Carregando mapa em tempo real..." />;
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <section className="space-y-5 bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
         <div 
           onClick={onTitleClick} 
-          className={`flex items-center gap-2 w-fit ${onTitleClick ? 'cursor-pointer hover:text-blue-600 transition-colors group' : ''}`}
+          className={`flex items-center gap-3 w-fit ${onTitleClick ? 'cursor-pointer hover:text-blue-600 transition-colors group' : ''}`}
           title={onTitleClick ? "Ir para Agenda do Dia" : undefined}
         >
-          {inverted ? <Users className={`text-neutral-400 ${onTitleClick ? 'group-hover:text-blue-500' : ''}`} size={20} /> : <Map className={`text-neutral-400 ${onTitleClick ? 'group-hover:text-blue-500' : ''}`} size={20} />}
-          <h2 className="text-lg font-bold">{customTitle}</h2>
-          {onTitleClick && <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 -ml-1" />}
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+            {inverted ? <Users className="text-blue-600" size={20} /> : <Map className="text-blue-600" size={20} />}
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-neutral-900 leading-tight">{customTitle}</h2>
+            <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold mt-0.5">Visão Espacial</p>
+          </div>
+          {onTitleClick && <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-transform transform translate-x-0 group-hover:translate-x-1 text-blue-500 ml-1" />}
         </div>
 
         {availableBlocks.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-            <div className="flex items-center gap-1.5 shrink-0 text-neutral-400 mr-1">
-              <Building2 size={14} />
-            </div>
-            <button
-              onClick={() => setBlockFilter("all")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all border ${
-                blockFilter === "all" ? "bg-neutral-900 text-white border-neutral-900" : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400"
-              }`}
-            >
-              Todos
-            </button>
-            {availableBlocks.map(block => (
-              <button
-                key={block}
-                onClick={() => setBlockFilter(block)}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all border ${
-                  blockFilter === block ? "bg-neutral-900 text-white border-neutral-900" : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400"
-                }`}
-              >
-                {block}
-              </button>
-            ))}
+          <div className="w-full sm:w-auto">
+            <CustomDropdown 
+              value={blockFilter} 
+              options={[{ value: "all", label: "Todos os blocos" }, ...availableBlocks.map(b => ({ value: b, label: b }))]} 
+              onChange={setBlockFilter} 
+              icon={Building2} 
+            />
           </div>
         )}
       </div>
@@ -119,7 +109,7 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
           const isOccupied = !!currentRes;
 
           return (
-            <div key={lab.id} className={`p-4 rounded-xl border transition-all flex flex-col justify-between min-h-[100px] ${isOccupied ? "bg-blue-50 border-blue-200 shadow-sm" : "bg-white border-neutral-200 hover:border-neutral-300"}`}>
+            <div key={lab.id} className={`p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[110px] ${isOccupied ? "bg-blue-50/50 border-blue-200 shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
                <div className="flex justify-between items-start mb-2 gap-2">
                  <span className={`font-bold text-sm truncate ${inverted && isOccupied ? "text-blue-800" : "text-neutral-800"}`} title={inverted && isOccupied ? currentRes.user?.full_name : lab.name}>
                    {inverted && isOccupied ? currentRes.user?.full_name : lab.name}
@@ -127,7 +117,7 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
                  {isOccupied ? (
                     <span className="flex h-2.5 w-2.5 relative shrink-0 mt-1">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
                     </span>
                  ) : (
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shrink-0 mt-1" title="Livre"></span>
@@ -139,12 +129,12 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
                    <p className="font-medium truncate" title={inverted ? lab.name : currentRes.user?.full_name}>
                      {inverted ? <><Building2 size={10} className="inline mr-1 -mt-0.5"/>{lab.name}</> : currentRes.user?.full_name}
                    </p>
-                   <p className={`mt-0.5 ${inverted ? "text-blue-600 font-bold" : "opacity-80"}`}>
+                   <p className={`mt-1 text-[10px] uppercase tracking-wider ${inverted ? "text-blue-600 font-bold" : "opacity-80 font-bold"}`}>
                      {inverted ? "Em aula agora" : "Em aula agora"}
                    </p>
                  </div>
                ) : (
-                 <p className="text-xs text-neutral-400 mt-auto font-medium">{inverted ? "Sem professor alocado" : "Livre"}</p>
+                 <p className="text-xs text-neutral-400 mt-auto font-bold uppercase tracking-wider">{inverted ? "Sem professor" : "Livre"}</p>
                )}
             </div>
           )
@@ -171,23 +161,28 @@ function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
   return (
     <div className="space-y-8 pb-12 w-full">
       <header>
-        <h1 className="text-3xl font-bold text-neutral-900">Painel DTI</h1>
-        <p className="text-neutral-500">Visão geral da operação e infraestrutura.</p>
+        <h1 className="text-3xl font-black text-neutral-900 tracking-tight">Painel DTI</h1>
+        <p className="text-neutral-500 font-medium mt-1">Visão geral da operação e infraestrutura.</p>
       </header>
 
       {/* SEÇÃO 1: MAPA EM TEMPO REAL */}
       <LiveLabMap onTitleClick={() => onNavigate?.('daily')} />
 
       {/* SEÇÃO 2: ESTATÍSTICAS OPERACIONAIS */}
-      <section className="space-y-4 pt-4 border-t border-neutral-200">
+      <section className="space-y-5 pt-4">
         <div 
           onClick={() => onNavigate?.('reservations')} 
-          className="flex items-center gap-2 w-fit cursor-pointer hover:text-blue-600 transition-colors group"
+          className="flex items-center gap-3 w-fit cursor-pointer hover:text-blue-600 transition-colors group"
           title="Ir para Gerenciamento de Reservas"
         >
-          <LayoutGrid className="text-neutral-400 group-hover:text-blue-500 transition-colors" size={20} />
-          <h2 className="text-lg font-bold">Resumo Operacional</h2>
-          <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 -ml-1" />
+          <div className="w-10 h-10 rounded-xl bg-neutral-900 flex items-center justify-center group-hover:bg-blue-600 transition-colors shadow-inner">
+            <LayoutGrid className="text-white" size={18} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold leading-tight">Resumo Operacional</h2>
+            <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold mt-0.5">Reservas</p>
+          </div>
+          <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-transform transform translate-x-0 group-hover:translate-x-1 text-blue-500 ml-1" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -196,24 +191,29 @@ function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
             { label: "Agendamentos p/ Hoje",  value: today?.length ?? "—" },
             { label: "Aguardando Software",   value: software?.length ?? "—" },
           ].map(stat => (
-            <div key={stat.label} className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm hover:border-neutral-300 transition-colors">
-              <p className="text-[10px] md:text-xs font-bold text-neutral-400 uppercase mb-1">{stat.label}</p>
-              <p className="text-3xl font-bold text-neutral-800">{stat.value}</p>
+            <div key={stat.label} className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow">
+              <p className="text-[10px] md:text-xs font-bold text-neutral-400 uppercase tracking-widest mb-1">{stat.label}</p>
+              <p className="text-4xl font-black text-neutral-900">{stat.value}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* SEÇÃO 3: RESUMO DE MANUTENÇÃO */}
-      <section className="space-y-4 pt-4 border-t border-neutral-200">
+      <section className="space-y-5 pt-4">
         <div 
           onClick={() => onNavigate?.('maintenance')} 
-          className="flex items-center gap-2 w-fit cursor-pointer hover:text-blue-600 transition-colors group"
+          className="flex items-center gap-3 w-fit cursor-pointer hover:text-blue-600 transition-colors group"
           title="Ir para Controle de Manutenção"
         >
-          <Wrench className="text-neutral-400 group-hover:text-blue-500 transition-colors" size={20} />
-          <h2 className="text-lg font-bold">Resumo de Manutenção</h2>
-          <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 -ml-1" />
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center group-hover:bg-amber-200 transition-colors shadow-inner">
+            <Wrench className="text-amber-600" size={18} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold leading-tight">Infraestrutura</h2>
+            <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold mt-0.5">Tickets de Manutenção</p>
+          </div>
+          <ChevronRight size={18} className="opacity-0 group-hover:opacity-100 transition-transform transform translate-x-0 group-hover:translate-x-1 text-blue-500 ml-1" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -222,9 +222,9 @@ function DTIDashboard({ onNavigate }: { onNavigate?: (page: string) => void }) {
             { label: "Em Andamento",    value: tickets?.filter(t => t.status === "em_andamento").length ?? "—" },
             { label: "Críticos",        value: tickets?.filter(t => t.severity === "critico" && t.status !== "resolvido").length ?? "—", highlight: true },
           ].map(stat => (
-            <div key={stat.label} className={`bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition-all ${stat.highlight ? 'border-red-200 bg-red-50/50' : 'border-neutral-200'}`}>
-              <p className={`text-[10px] md:text-xs font-bold uppercase mb-1 ${stat.highlight ? 'text-red-500' : 'text-neutral-400'}`}>{stat.label}</p>
-              <p className={`text-3xl font-bold ${stat.highlight ? 'text-red-600' : 'text-neutral-800'}`}>{stat.value}</p>
+            <div key={stat.label} className={`bg-white p-6 rounded-3xl border shadow-sm hover:shadow-md transition-all ${stat.highlight ? 'border-red-200 bg-red-50/50' : 'border-neutral-200'}`}>
+              <p className={`text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 ${stat.highlight ? 'text-red-600' : 'text-neutral-400'}`}>{stat.label}</p>
+              <p className={`text-4xl font-black ${stat.highlight ? 'text-red-700' : 'text-neutral-900'}`}>{stat.value}</p>
             </div>
           ))}
         </div>
@@ -306,55 +306,53 @@ function ProfessorDashboard({ onNewReservation }: { onNewReservation: () => void
     <div className="space-y-8">
       {ToastComponent}
       <header>
-        <h1 className="text-3xl font-bold text-neutral-900">Início</h1>
-        <p className="text-neutral-500">Gerencie suas aulas e solicitações de laboratório.</p>
+        <h1 className="text-3xl font-black text-neutral-900 tracking-tight">Início</h1>
+        <p className="text-neutral-500 font-medium mt-1">Gerencie suas aulas e solicitações de laboratório.</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div onClick={onNewReservation} className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group flex items-center gap-4">
-          <div className="bg-blue-50 text-blue-600 w-12 h-12 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-            <Calendar size={20} />
+        <div onClick={onNewReservation} className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group flex items-center gap-4">
+          <div className="bg-neutral-900 text-white w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-inner">
+            <Calendar size={22} />
           </div>
           <div>
-            <h3 className="font-bold text-base text-neutral-800">Nova Reserva</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Solicitar laboratório</p>
+            <h3 className="font-bold text-lg text-neutral-900">Nova Reserva</h3>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mt-0.5">Agendar Lab</p>
           </div>
         </div>
 
-        <div onClick={handleMateriaisAvulsos} className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group flex items-center gap-4">
-          <div className="bg-emerald-50 text-emerald-600 w-12 h-12 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-            <Package size={20} />
+        <div onClick={handleMateriaisAvulsos} className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group flex items-center gap-4">
+          <div className="bg-emerald-50 text-emerald-600 w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-emerald-100">
+            <Package size={22} />
           </div>
           <div>
-            <h3 className="font-bold text-base text-neutral-800">Materiais Avulsos</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Equipar aulas ativas</p>
+            <h3 className="font-bold text-lg text-neutral-900">Materiais Avulsos</h3>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mt-0.5">Equipar aulas</p>
           </div>
         </div>
 
-        <div className="bg-neutral-50 p-5 rounded-2xl border border-neutral-200 opacity-60 cursor-not-allowed flex items-center gap-4">
-          <div className="bg-neutral-200 text-neutral-500 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
-            <Monitor size={20} />
+        <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-200 opacity-60 cursor-not-allowed flex items-center gap-4">
+          <div className="bg-neutral-200 text-neutral-500 w-14 h-14 rounded-2xl flex items-center justify-center shrink-0">
+            <Monitor size={22} />
           </div>
           <div>
-            <h3 className="font-bold text-base text-neutral-700">Consultar Labs</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Desativado</p>
+            <h3 className="font-bold text-lg text-neutral-700">Consultar Labs</h3>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mt-0.5">Desativado</p>
           </div>
         </div>
       </div>
 
-      <section className="space-y-4 pt-4 border-t border-neutral-200">
-        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-          <h2 className="font-bold text-lg">Minhas Reservas</h2>
+      <section className="space-y-5 pt-4">
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-neutral-100 pb-4">
+          <h2 className="font-bold text-xl text-neutral-900">Minhas Reservas</h2>
           
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-            {WEEKDAYS.map(day => (
-              <button key={day.value} onClick={() => setWeekdayFilter(day.value)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold transition-all border ${
-                  weekdayFilter === day.value ? "bg-neutral-900 text-white border-neutral-900" : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400"
-                }`}>
-                {day.label}
-              </button>
-            ))}
+          <div className="w-full sm:w-auto">
+            <CustomDropdown 
+              value={weekdayFilter} 
+              options={WEEKDAYS} 
+              onChange={setWeekdayFilter} 
+              icon={Filter} 
+            />
           </div>
         </div>
 
@@ -362,37 +360,43 @@ function ProfessorDashboard({ onNewReservation }: { onNewReservation: () => void
         {error && <ErrorMessage message={error} onRetry={refetch} />}
 
         {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {groupedReservations.length === 0 ? (
-              <div className="col-span-full bg-white rounded-2xl border border-dashed border-neutral-200 p-12 text-center">
-                <Calendar className="mx-auto text-neutral-200 mb-4" size={48} />
-                <p className="text-neutral-500 font-medium">Nenhuma reserva encontrada para este filtro.</p>
+              <div className="col-span-full bg-white rounded-3xl border border-dashed border-neutral-200 p-12 text-center">
+                <Calendar className="mx-auto text-neutral-200 mb-4" size={56} />
+                <p className="text-neutral-500 font-bold text-lg">Nenhuma reserva encontrada para este filtro.</p>
+                <button
+                  onClick={onNewReservation}
+                  className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                >
+                  Criar sua primeira reserva
+                </button>
               </div>
             ) : (
               groupedReservations.map(res => (
-                <div key={res.id} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start gap-2 mb-4">
-                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase ${STATUS_STYLES[res.status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}>
+                <div key={res.id} className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start gap-2 mb-5">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${STATUS_STYLES[res.status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}>
                       {res.status.replace("_", " ")}
                     </span>
-                    {res.isGroup && <span className="bg-neutral-100 text-neutral-500 border border-neutral-200 px-2 py-1 rounded-md text-[10px] font-bold">LOTE</span>}
+                    {res.isGroup && <span className="bg-neutral-100 text-neutral-500 border border-neutral-200 px-2 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase">LOTE</span>}
                   </div>
                   
                   <div>
-                    <h3 className="font-bold text-neutral-900 text-lg leading-tight mb-1">{res.timeDisplay}</h3>
-                    <p className="text-sm font-semibold text-neutral-700 flex items-center gap-1.5">
+                    <h3 className="font-black text-neutral-900 text-xl leading-tight mb-2">{res.timeDisplay}</h3>
+                    <p className="text-sm font-bold text-neutral-700 flex items-center gap-2">
                       <Monitor size={14} className="text-neutral-400" />
                       {res.labName ?? "Laboratório não definido"}
                     </p>
-                    <p className="text-xs text-neutral-500 mt-1 flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-neutral-500 mt-1 flex items-center gap-2 uppercase tracking-widest">
                       <Building2 size={12} className="text-neutral-400" />
                       {res.blockName ?? "Sem Bloco"}
                     </p>
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t border-neutral-100 flex items-center justify-between">
-                    <span className="text-xs font-medium text-neutral-400">{res.dateDisplay}</span>
-                    <button className="text-blue-600 hover:text-blue-800 text-[10px] font-bold uppercase tracking-wider transition-colors">Ver Detalhes</button>
+                  <div className="mt-5 pt-4 border-t border-neutral-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-neutral-400">{res.dateDisplay}</span>
+                    <button className="text-blue-600 hover:text-blue-800 text-[10px] font-bold uppercase tracking-wider transition-colors bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100">Ver Detalhes</button>
                   </div>
                 </div>
               ))
@@ -411,11 +415,10 @@ function ProgexDashboard({ onNavigate }: { onNavigate?: (page: string) => void }
   return (
     <div className="space-y-8 pb-12 w-full">
       <header>
-        <h1 className="text-3xl font-bold text-neutral-900">Visão Executiva</h1>
-        <p className="text-neutral-500">Monitoramento global da ocupação e infraestrutura.</p>
+        <h1 className="text-3xl font-black text-neutral-900 tracking-tight">Visão Executiva</h1>
+        <p className="text-neutral-500 font-medium mt-1">Monitoramento global da ocupação e infraestrutura.</p>
       </header>
       
-      {/* Progex: Mapa invertido dando foco no Professor */}
       <LiveLabMap inverted={true} customTitle="Professores Ativos Agora" onTitleClick={() => onNavigate?.('daily')} />
     </div>
   );
@@ -429,6 +432,6 @@ export function DashboardPage({ onNewReservation, onNavigate }: { onNewReservati
   if (!user) return null;
 
   if (user.role === UserRole.PROFESSOR) return <ProfessorDashboard onNewReservation={onNewReservation} />;
-  if (user.role === UserRole.PROGEX || user.role === UserRole.ADMINISTRADOR) return <ProgexDashboard onNavigate={onNavigate} />;
+  if (user.role === UserRole.PROGEX || user.role === UserRole.ADMINISTRADOR || user.role === UserRole.SUPER_ADMIN) return <ProgexDashboard onNavigate={onNavigate} />;
   return <DTIDashboard onNavigate={onNavigate} />;
 }

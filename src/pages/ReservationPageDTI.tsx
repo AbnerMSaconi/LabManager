@@ -1,18 +1,12 @@
 /**
  * Tela de Reservas — visão do DTI (Técnico e Estagiário)
- *
- * DTI_TECNICO — ações por status:
- *   PENDENTE               → Aprovar | Aprovar com Ressalvas | Agendar Software | Rejeitar
- *   APROVADO_COM_RESSALVAS → Aprovar (definitivo)
- *   AGUARDANDO_SOFTWARE    → Confirmar Instalação de Software
- *
- * DTI_ESTAGIARIO — somente leitura
  */
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   CheckCircle2, XCircle, Calendar, Layers,
   ChevronDown, ChevronUp, CalendarDays, Search,
   Eye, AlertTriangle, CheckCheck, X, Info, Monitor, MoreHorizontal,
+  SortAsc, SortDesc, Building2, Check
 } from "lucide-react";
 import { UserRole, ReservationStatus, Reservation } from "../types";
 import { useAuth } from "../hooks/useAuth";
@@ -26,8 +20,6 @@ import { ApiError } from "../api/client";
 const ITEMS_PER_PAGE = 8;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Cadência semanal: todas as datas consecutivas têm diff exato de 7 dias, mínimo 4 */
 function isWeeklyCadence(dates: string[]): boolean {
   if (dates.length < 4) return false;
   const sorted = [...dates].sort();
@@ -50,19 +42,68 @@ function groupLabel(group: Reservation[]) {
   return { type: "pontual" as const };
 }
 
-// ─── Modal genérico de texto ──────────────────────────────────────────────────
-
-function TextModal({
-  title, subtitle, placeholder, confirmLabel, confirmClass,
-  icon, onConfirm, onClose, loading, required = true,
+// ─── Dropdown Customizado ─────────────────────────────────────────────────────
+function CustomDropdown({
+  value, options, onChange, icon: Icon, prefix = "", placeholder = "Selecione"
 }: {
-  title: string; subtitle: string; placeholder: string;
-  confirmLabel: string; confirmClass: string;
-  icon: React.ReactNode;
-  onConfirm: (text: string) => void;
-  onClose: () => void;
-  loading: boolean;
-  required?: boolean;
+  value: string | number; options: { value: string | number; label: string }[];
+  onChange: (val: any) => void; icon: React.ElementType; prefix?: string; placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const selectedLabel = options.find(o => String(o.value) === String(value))?.label;
+
+  return (
+    <div className="relative w-full sm:w-auto" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`w-full sm:w-auto flex items-center justify-between gap-3 bg-white border border-neutral-200 py-2 px-3 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-neutral-300 shadow-sm transition-all active:scale-[0.98] ${open ? "ring-2 ring-neutral-200" : "hover:bg-neutral-50"}`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon size={15} className="text-neutral-500" />
+          <span className="truncate max-w-[160px] text-left text-neutral-700">
+            {selectedLabel ? <>{prefix}<span className="font-bold">{selectedLabel}</span></> : <span className="text-neutral-400">{placeholder}</span>}
+          </span>
+        </div>
+        <ChevronDown size={14} className={`text-neutral-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 w-full sm:min-w-[200px] mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] z-50 py-1.5">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+            {options.map((opt) => (
+              <button
+                key={String(opt.value)}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm font-bold transition-colors flex items-center justify-between ${
+                  String(value) === String(opt.value) ? "bg-neutral-100 text-neutral-900" : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                }`}
+              >
+                <span className="truncate pr-2">{prefix}{opt.label}</span>
+                {String(value) === String(opt.value) && <Check size={14} className="text-neutral-900 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Modal genérico de texto ──────────────────────────────────────────────────
+function TextModal({
+  title, subtitle, placeholder, confirmLabel, confirmClass, icon, onConfirm, onClose, loading, required = true,
+}: {
+  title: string; subtitle: string; placeholder: string; confirmLabel: string; confirmClass: string;
+  icon: React.ReactNode; onConfirm: (text: string) => void; onClose: () => void; loading: boolean; required?: boolean;
 }) {
   const [text, setText] = useState("");
   const canSubmit = required ? text.trim().length > 0 : true;
@@ -75,17 +116,12 @@ function TextModal({
         </div>
         <p className="text-sm text-neutral-600">{subtitle}</p>
         <textarea
-          value={text} onChange={e => setText(e.target.value)}
-          rows={4} placeholder={placeholder}
+          value={text} onChange={e => setText(e.target.value)} rows={4} placeholder={placeholder}
           className="w-full border border-neutral-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300"
         />
         <div className="flex gap-3 pt-1">
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50">
-            Cancelar
-          </button>
-          <button onClick={() => canSubmit && onConfirm(text.trim())} disabled={!canSubmit || loading}
-            className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${confirmClass}`}>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
+          <button onClick={() => canSubmit && onConfirm(text.trim())} disabled={!canSubmit || loading} className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${confirmClass}`}>
             {loading ? "Aguarde…" : confirmLabel}
           </button>
         </div>
@@ -95,21 +131,16 @@ function TextModal({
 }
 
 // ─── Modal de agendamento de software ────────────────────────────────────────
-
 function SwModal({
-  labName, professor, softwares,
-  onConfirm, onClose, loading,
+  labName, professor, softwares, onConfirm, onClose, loading,
 }: {
-  labName?: string; professor?: string; softwares?: string;
-  onConfirm: () => void; onClose: () => void; loading: boolean;
+  labName?: string; professor?: string; softwares?: string; onConfirm: () => void; onClose: () => void; loading: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-black/5 p-6 space-y-4">
         <div className="flex justify-between items-start">
-          <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
-            <Monitor size={20} className="text-purple-500" /> Agendar Instalação de Software
-          </h3>
+          <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Monitor size={20} className="text-purple-500" /> Agendar Instalação de Software</h3>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 mt-0.5"><X size={20} /></button>
         </div>
         <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-2 text-sm">
@@ -117,17 +148,10 @@ function SwModal({
           <p><span className="font-bold text-purple-700">Professor:</span> {professor ?? "—"}</p>
           <p><span className="font-bold text-purple-700">Softwares:</span> {softwares ?? "—"}</p>
         </div>
-        <p className="text-sm text-neutral-600">
-          Um ticket de manutenção será criado e a reserva passará para{" "}
-          <strong>Aguardando Software</strong> até a confirmação da instalação.
-        </p>
+        <p className="text-sm text-neutral-600">Um ticket de manutenção será criado e a reserva passará para <strong>Aguardando Software</strong> até a confirmação da instalação.</p>
         <div className="flex gap-3 pt-1">
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50">
-            Cancelar
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-700 disabled:opacity-50">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
+          <button onClick={onConfirm} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-700 disabled:opacity-50">
             {loading ? "Criando ticket…" : "Confirmar e Criar Ticket"}
           </button>
         </div>
@@ -137,38 +161,25 @@ function SwModal({
 }
 
 // ─── Popover de ações ─────────────────────────────────────────────────────────
-
 const ACTION_COLORS: Record<string, string> = {
-  emerald: "text-emerald-700 hover:bg-emerald-50",
-  amber:   "text-amber-700 hover:bg-amber-50",
-  purple:  "text-purple-700 hover:bg-purple-50",
-  red:     "text-red-600 hover:bg-red-50",
-  blue:    "text-blue-700 hover:bg-blue-50",
+  emerald: "text-emerald-700 hover:bg-emerald-50", amber: "text-amber-700 hover:bg-amber-50",
+  purple: "text-purple-700 hover:bg-purple-50", red: "text-red-600 hover:bg-red-50", blue: "text-blue-700 hover:bg-blue-50",
 };
 
-type ActionItem = {
-  label: string;
-  Icon: React.ElementType;
-  color: string;
-  onClick: () => void;
-};
+type ActionItem = { label: string; Icon: React.ElementType; color: string; onClick: () => void; };
 
 function ActionPopover({
-  status, hasSW,
-  onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
+  status, hasSW, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
 }: {
   status: ReservationStatus; hasSW: boolean;
-  onApprove: () => void; onCaveats: () => void;
-  onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
+  onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
@@ -176,45 +187,31 @@ function ActionPopover({
   const actions: ActionItem[] = [];
 
   if (status === ReservationStatus.PENDENTE) {
-    actions.push({ label: "Aprovar",               Icon: CheckCircle2,   color: "emerald", onClick: onApprove });
-    actions.push({ label: "Aprovar com Ressalvas",  Icon: AlertTriangle,  color: "amber",   onClick: onCaveats });
-    if (hasSW)
-      actions.push({ label: "Agendar Software",    Icon: Monitor,        color: "purple",  onClick: onScheduleSW });
-    actions.push({ label: "Rejeitar",               Icon: XCircle,        color: "red",     onClick: onReject });
+    actions.push({ label: "Aprovar", Icon: CheckCircle2, color: "emerald", onClick: onApprove });
+    actions.push({ label: "Aprovar com Ressalvas", Icon: AlertTriangle, color: "amber", onClick: onCaveats });
+    if (hasSW) actions.push({ label: "Agendar Software", Icon: Monitor, color: "purple", onClick: onScheduleSW });
+    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
   } else if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
-    actions.push({ label: "Confirmar Aprovação",    Icon: CheckCheck,     color: "emerald", onClick: onApprove });
-    actions.push({ label: "Rejeitar",               Icon: XCircle,        color: "red",     onClick: onReject });
+    actions.push({ label: "Confirmar Aprovação", Icon: CheckCheck, color: "emerald", onClick: onApprove });
+    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
   } else if (status === ReservationStatus.AGUARDANDO_SOFTWARE) {
-    actions.push({ label: "Confirmar Instalação",   Icon: CheckCheck,     color: "blue",    onClick: onConfirmSW });
-    actions.push({ label: "Rejeitar",               Icon: XCircle,        color: "red",     onClick: onReject });
+    actions.push({ label: "Confirmar Instalação", Icon: CheckCheck, color: "blue", onClick: onConfirmSW });
+    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
   }
 
   if (actions.length === 0) return null;
 
   return (
     <div className="relative inline-block" ref={ref}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-          open
-            ? "bg-neutral-900 text-white border-neutral-900"
-            : "bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200"
-        }`}
-      >
+      <button onClick={() => setOpen(v => !v)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${open ? "bg-neutral-900 text-white border-neutral-900" : "bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200"}`}>
         <MoreHorizontal size={14} />
       </button>
-
       {open && (
         <div className="absolute right-0 top-full mt-1.5 z-40 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden w-52">
           <div className="py-1">
             {actions.map(({ label, Icon, color, onClick }) => (
-              <button
-                key={label}
-                onClick={() => { onClick(); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors ${ACTION_COLORS[color]}`}
-              >
-                <Icon size={15} />
-                {label}
+              <button key={label} onClick={() => { onClick(); setOpen(false); }} className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors ${ACTION_COLORS[color]}`}>
+                <Icon size={15} /> {label}
               </button>
             ))}
           </div>
@@ -225,14 +222,11 @@ function ActionPopover({
 }
 
 // ─── Linha avulsa ─────────────────────────────────────────────────────────────
-
 function SingleRow({
-  r, canApprove,
-  onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
+  r, canApprove, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
 }: {
   r: Reservation; canApprove: boolean;
-  onApprove: () => void; onCaveats: () => void;
-  onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
+  onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
 }) {
   return (
     <tr className="hover:bg-neutral-50 transition-colors border-b border-neutral-100">
@@ -245,40 +239,21 @@ function SingleRow({
         <p className="text-xs text-neutral-500">{r.laboratory?.block}</p>
       </td>
       <td className="px-4 py-4">
-        <p className="text-sm font-medium text-neutral-700 flex items-center gap-1.5">
-          <CalendarDays size={13} className="text-neutral-400" />
-          {new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR")}
-        </p>
-        <p className="text-xs text-neutral-400 mt-0.5">
-          {new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long" })}
-        </p>
+        <p className="text-sm font-medium text-neutral-700 flex items-center gap-1.5"><CalendarDays size={13} className="text-neutral-400" />{new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+        <p className="text-xs text-neutral-400 mt-0.5">{new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long" })}</p>
       </td>
       <td className="px-4 py-4">
         <p className="text-sm font-bold text-neutral-700">{r.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1 mt-1 flex-wrap">
           {r.items && r.items.length > 0 && <MaterialsBadge items={r.items} />}
-          {r.requested_softwares && (
-            <SoftwareBadge
-              softwares={r.requested_softwares}
-              label={r.software_installation_required ? "Instalar SW" : "SW Solicitado"}
-            />
-          )}
+          {r.requested_softwares && <SoftwareBadge softwares={r.requested_softwares} label={r.software_installation_required ? "Instalar SW" : "SW Solicitado"} />}
         </div>
-        {r.approval_notes && (
-          <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={r.approval_notes}>
-            <Info size={10} /> {r.approval_notes.length > 50 ? r.approval_notes.slice(0, 50) + "…" : r.approval_notes}
-          </p>
-        )}
+        {r.approval_notes && <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={r.approval_notes}><Info size={10} /> {r.approval_notes.length > 50 ? r.approval_notes.slice(0, 50) + "…" : r.approval_notes}</p>}
       </td>
       <td className="px-4 py-4"><StatusBadge status={r.status} /></td>
       <td className="px-4 py-4 text-right">
         {canApprove && (
-          <ActionPopover
-            status={r.status}
-            hasSW={!!r.requested_softwares && !!r.software_installation_required}
-            onApprove={onApprove} onCaveats={onCaveats}
-            onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject}
-          />
+          <ActionPopover status={r.status} hasSW={!!r.requested_softwares && !!r.software_installation_required} onApprove={onApprove} onCaveats={onCaveats} onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject} />
         )}
       </td>
     </tr>
@@ -286,14 +261,11 @@ function SingleRow({
 }
 
 // ─── Linha de lote ─────────────────────────────────────────────────────────────
-
 function GroupRow({
-  group, canApprove,
-  onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
+  group, canApprove, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
 }: {
   group: Reservation[]; canApprove: boolean;
-  onApprove: () => void; onCaveats: () => void;
-  onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
+  onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const first = group[0];
@@ -304,13 +276,8 @@ function GroupRow({
     <tr className="border-b border-neutral-200 bg-neutral-50/50 hover:bg-neutral-50 transition-colors">
       <td className="px-4 py-4">
         <p className="font-bold text-sm text-neutral-900">{first.user?.full_name}</p>
-        <span className={`inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
-          type === "semestral"
-            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-            : "bg-sky-50 text-sky-700 border-sky-200"
-        }`}>
-          <Layers size={10} />
-          {type === "semestral" ? "SEMESTRAL" : "LOTE PONTUAL"} · {group.length} aulas
+        <span className={`inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded border ${type === "semestral" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+          <Layers size={10} /> {type === "semestral" ? "SEMESTRAL" : "LOTE PONTUAL"} · {group.length} aulas
         </span>
       </td>
       <td className="px-4 py-4">
@@ -320,25 +287,17 @@ function GroupRow({
       <td className="px-4 py-4">
         {type === "semestral" ? (
           <div>
-            <p className="text-sm font-bold text-neutral-700 flex items-center gap-1.5">
-              <CalendarDays size={13} className="text-indigo-500" /> Toda {weekday}
-            </p>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              {new Date(sorted[0].date + "T12:00:00").toLocaleDateString("pt-BR")} →{" "}
-              {new Date(sorted[sorted.length - 1].date + "T12:00:00").toLocaleDateString("pt-BR")}
-            </p>
+            <p className="text-sm font-bold text-neutral-700 flex items-center gap-1.5"><CalendarDays size={13} className="text-indigo-500" /> Toda {weekday}</p>
+            <p className="text-xs text-neutral-400 mt-0.5">{new Date(sorted[0].date + "T12:00:00").toLocaleDateString("pt-BR")} → {new Date(sorted[sorted.length - 1].date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
           </div>
         ) : (
           <div className="relative">
-            <button onClick={() => setOpen(v => !v)}
-              className="flex items-center gap-1.5 text-sm font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg transition-colors">
+            <button onClick={() => setOpen(v => !v)} className="flex items-center gap-1.5 text-sm font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg transition-colors">
               <CalendarDays size={13} /> {group.length} datas {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </button>
             {open && (
               <div className="absolute top-full left-0 z-30 mt-1 bg-white border border-neutral-200 rounded-xl shadow-xl w-64">
-                <div className="bg-neutral-50 border-b border-neutral-100 px-3 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
-                  Todas as datas ({group.length})
-                </div>
+                <div className="bg-neutral-50 border-b border-neutral-100 px-3 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Todas as datas ({group.length})</div>
                 <div className="max-h-52 overflow-y-auto p-1 custom-scrollbar">
                   {sorted.map(r => (
                     <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-neutral-50 text-xs font-medium text-neutral-700">
@@ -356,28 +315,14 @@ function GroupRow({
         <p className="text-sm font-bold text-neutral-700">{first.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1 mt-1 flex-wrap">
           {first.items && first.items.length > 0 && <MaterialsBadge items={first.items} />}
-          {first.requested_softwares && (
-            <SoftwareBadge
-              softwares={first.requested_softwares}
-              label={first.software_installation_required ? "Instalar SW" : "SW Solicitado"}
-            />
-          )}
+          {first.requested_softwares && <SoftwareBadge softwares={first.requested_softwares} label={first.software_installation_required ? "Instalar SW" : "SW Solicitado"} />}
         </div>
-        {first.approval_notes && (
-          <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={first.approval_notes}>
-            <Info size={10} /> {first.approval_notes.length > 50 ? first.approval_notes.slice(0, 50) + "…" : first.approval_notes}
-          </p>
-        )}
+        {first.approval_notes && <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={first.approval_notes}><Info size={10} /> {first.approval_notes.length > 50 ? first.approval_notes.slice(0, 50) + "…" : first.approval_notes}</p>}
       </td>
       <td className="px-4 py-4"><StatusBadge status={first.status} /></td>
       <td className="px-4 py-4 text-right">
         {canApprove && (
-          <ActionPopover
-            status={first.status}
-            hasSW={!!first.requested_softwares && !!first.software_installation_required}
-            onApprove={onApprove} onCaveats={onCaveats}
-            onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject}
-          />
+          <ActionPopover status={first.status} hasSW={!!first.requested_softwares && !!first.software_installation_required} onApprove={onApprove} onCaveats={onCaveats} onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject} />
         )}
       </td>
     </tr>
@@ -394,7 +339,7 @@ type ModalState =
 
 export function ReservationPageDTI() {
   const { user } = useAuth();
-  const canApprove = user?.role === UserRole.DTI_TECNICO;
+  const canApprove = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.SUPER_ADMIN;
 
   const { showToast, ToastComponent } = useToast();
   const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
@@ -405,91 +350,82 @@ export function ReservationPageDTI() {
   const [modal, setModal]               = useState<ModalState>({ type: "none" });
   const [busy, setBusy]                 = useState(false);
   const [conflictWarning, setConflict]  = useState<string | null>(null);
+  const [sortOrder, setSortOrder]       = useState<"desc" | "asc">("desc");
+  const [filterBlock, setFilterBlock]   = useState<string>("");
+  const [filterLab, setFilterLab]       = useState<string>("");
+  const [searchProf, setSearchProf]     = useState<string>("");
 
-  // ── Filtragem ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!data) return [];
-    if (filter === "all")
-      return data.filter(r =>
-        r.status !== ReservationStatus.REJEITADO &&
-        r.status !== ReservationStatus.CANCELADO
-      );
-    return data.filter(r => r.status === filter);
-  }, [data, filter]);
+    let result = filter === "all"
+      ? data.filter(r => r.status !== ReservationStatus.REJEITADO && r.status !== ReservationStatus.CANCELADO)
+      : data.filter(r => r.status === filter);
+    if (filterBlock) result = result.filter(r => r.laboratory?.block === filterBlock);
+    if (filterLab)   result = result.filter(r => r.laboratory?.name  === filterLab);
+    if (searchProf.trim()) {
+      const q = searchProf.trim().toLowerCase();
+      result = result.filter(r => r.user?.full_name?.toLowerCase().includes(q));
+    }
+    return result;
+  }, [data, filter, filterBlock, filterLab, searchProf]);
 
-  // ── Agrupamento sobre lista completa filtrada ──────────────────────────────
+  const { blockOptions, labOptions } = useMemo(() => {
+    if (!data) return { blockOptions: [], labOptions: [] };
+    let base = filter === "all"
+      ? data.filter(r => r.status !== ReservationStatus.REJEITADO && r.status !== ReservationStatus.CANCELADO)
+      : data.filter(r => r.status === filter);
+    if (filterBlock) base = base.filter(r => r.laboratory?.block === filterBlock);
+    const blocks = [...new Set(base.map(r => r.laboratory?.block).filter(Boolean))] as string[];
+    const labs   = [...new Set(base.map(r => r.laboratory?.name).filter(Boolean))]  as string[];
+    return { blockOptions: blocks.sort(), labOptions: labs.sort() };
+  }, [data, filter, filterBlock]);
+
   const { allGroups, allSingles } = useMemo(() => {
     const grps: Record<string, Reservation[]> = {};
     const sgls: Reservation[] = [];
     filtered.forEach(r => {
-      if (r.group_id) {
-        grps[r.group_id] = grps[r.group_id] ?? [];
-        grps[r.group_id].push(r);
-      } else {
-        sgls.push(r);
-      }
+      if (r.group_id) { grps[r.group_id] = grps[r.group_id] ?? []; grps[r.group_id].push(r); } 
+      else { sgls.push(r); }
     });
     Object.values(grps).forEach(g => g.sort((a, b) => a.date.localeCompare(b.date)));
     return { allGroups: grps, allSingles: sgls };
   }, [filtered]);
 
-  // ── Unidades paginadas (grupo = 1 unidade) ─────────────────────────────────
-  const units = useMemo(() => [
-    ...Object.keys(allGroups).map(id => ({ kind: "group" as const, id })),
-    ...allSingles.map(r        => ({ kind: "single" as const, r })),
-  ], [allGroups, allSingles]);
+  const units = useMemo(() => {
+    const groupUnits = Object.keys(allGroups).map(id => ({ kind: "group" as const, id, _ts: allGroups[id].reduce((max, r) => r.created_at > max ? r.created_at : max, "") }));
+    const singleUnits = allSingles.map(r => ({ kind: "single" as const, r, _ts: r.created_at }));
+    const all = [...groupUnits, ...singleUnits];
+    all.sort((a, b) => sortOrder === "desc" ? b._ts.localeCompare(a._ts) : a._ts.localeCompare(b._ts));
+    return all;
+  }, [allGroups, allSingles, sortOrder]);
 
   const visible = units.slice(0, visibleCount);
   const hasMore = visibleCount < units.length;
 
-  // ── Funções de review ──────────────────────────────────────────────────────
-  const doReview = (payload: ReviewPayload, id?: number, gid?: string) =>
-    gid ? reservationsApi.reviewGroup(gid, payload) : reservationsApi.review(id!, payload);
+  const doReview = (payload: ReviewPayload, id?: number, gid?: string) => gid ? reservationsApi.reviewGroup(gid, payload) : reservationsApi.review(id!, payload);
 
   const run = async (fn: () => Promise<void>, msg: string) => {
-    setBusy(true);
-    setConflict(null);
+    setBusy(true); setConflict(null);
     try { await fn(); showToast(msg, "success"); refetch(); setModal({ type: "none" }); }
     catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
-        setConflict(e.message);   // Mostra banner de conflito em vez de toast
-        setModal({ type: "none" });
-      } else {
-        showToast(e instanceof ApiError ? e.message : "Erro. Tente novamente.", "error");
-      }
+      if (e instanceof ApiError && e.status === 409) { setConflict(e.message); setModal({ type: "none" }); } 
+      else { showToast(e instanceof ApiError ? e.message : "Erro. Tente novamente.", "error"); }
     }
     finally { setBusy(false); }
   };
 
-  const approve    = (id: number, gid?: string) =>
-    run(() => doReview({ status: ReservationStatus.APROVADO }, id, gid), "Reserva aprovada.");
-
-  const confirmSW  = (id: number, gid?: string) =>
-    run(() => doReview({ status: ReservationStatus.APROVADO }, id, gid), "Instalação confirmada. Reserva aprovada.");
-
-  const submitCaveats = (notes: string) => {
-    if (modal.type !== "caveats") return;
-    run(() => doReview({ status: ReservationStatus.APROVADO_COM_RESSALVAS, approval_notes: notes }, modal.id, modal.groupId),
-      "Aprovado com ressalvas. O professor foi notificado.");
-  };
-
-  const submitReject = (reason: string) => {
-    if (modal.type !== "reject") return;
-    run(() => doReview({ status: ReservationStatus.REJEITADO, rejection_reason: reason }, modal.id, modal.groupId),
-      "Reserva rejeitada.");
-  };
+  const approve    = (id: number, gid?: string) => run(() => doReview({ status: ReservationStatus.APROVADO }, id, gid), "Reserva aprovada.");
+  const confirmSW  = (id: number, gid?: string) => run(() => doReview({ status: ReservationStatus.APROVADO }, id, gid), "Instalação confirmada. Reserva aprovada.");
+  const submitCaveats = (notes: string) => { if (modal.type === "caveats") run(() => doReview({ status: ReservationStatus.APROVADO_COM_RESSALVAS, approval_notes: notes }, modal.id, modal.groupId), "Aprovado com ressalvas. O professor foi notificado."); };
+  const submitReject = (reason: string) => { if (modal.type === "reject") run(() => doReview({ status: ReservationStatus.REJEITADO, rejection_reason: reason }, modal.id, modal.groupId), "Reserva rejeitada."); };
 
   const submitSW = () => {
     if (modal.type !== "sw") return;
     run(async () => {
       await maintenanceApi.create({
         title: `Instalação de Software — ${modal.labName ?? "Laboratório"}`,
-        description:
-          `Softwares solicitados: ${modal.softwares ?? "não especificado"}.\n` +
-          `Professor: ${modal.professor ?? "—"}.\n` +
-          `Reserva #${modal.id}${modal.groupId ? ` (Lote ${modal.groupId.slice(0, 8)}…)` : ""}.`,
-        lab_id: modal.labId,
-        severity: "medio",
+        description: `Softwares solicitados: ${modal.softwares ?? "não especificado"}.\nProfessor: ${modal.professor ?? "—"}.\nReserva #${modal.id}${modal.groupId ? ` (Lote ${modal.groupId.slice(0, 8)}…)` : ""}.`,
+        lab_id: modal.labId, severity: "medio",
       });
       await doReview({ status: ReservationStatus.AGUARDANDO_SOFTWARE }, modal.id, modal.groupId);
     }, "Ticket de instalação criado. Reserva aguardando software.");
@@ -501,41 +437,11 @@ export function ReservationPageDTI() {
     <div className="space-y-6 pb-12">
       {ToastComponent}
 
-      {/* ── Modais ── */}
-      {modal.type === "caveats" && (
-        <TextModal
-          title="Aprovar com Ressalvas"
-          subtitle="Descreva a ressalva — ela ficará visível ao professor no card da reserva."
-          placeholder="Ex: Laboratório disponível a partir das 14h. Aguarde confirmação do técnico."
-          confirmLabel="Confirmar Aprovação"
-          confirmClass="bg-amber-500 hover:bg-amber-600"
-          icon={<AlertTriangle size={20} className="text-amber-500" />}
-          onConfirm={submitCaveats}
-          onClose={() => setModal({ type: "none" })}
-          loading={busy}
-        />
-      )}
-      {modal.type === "reject" && (
-        <TextModal
-          title={modal.groupId ? "Rejeitar Lote" : "Rejeitar Reserva"}
-          subtitle="Informe o motivo da rejeição — ele será exibido ao professor."
-          placeholder="Ex: Laboratório indisponível no período solicitado."
-          confirmLabel="Confirmar Rejeição"
-          confirmClass="bg-red-500 hover:bg-red-600"
-          icon={<XCircle size={20} className="text-red-500" />}
-          onConfirm={submitReject}
-          onClose={() => setModal({ type: "none" })}
-          loading={busy}
-        />
-      )}
-      {modal.type === "sw" && (
-        <SwModal
-          labName={modal.labName} professor={modal.professor} softwares={modal.softwares}
-          onConfirm={submitSW} onClose={() => setModal({ type: "none" })} loading={busy}
-        />
-      )}
+      {/* Modais omitidos para brevidade (já estão no código original) */}
+      {modal.type === "caveats" && <TextModal title="Aprovar com Ressalvas" subtitle="Descreva a ressalva — ela ficará visível ao professor no card da reserva." placeholder="Ex: Laboratório disponível a partir das 14h. Aguarde confirmação do técnico." confirmLabel="Confirmar Aprovação" confirmClass="bg-amber-500 hover:bg-amber-600" icon={<AlertTriangle size={20} className="text-amber-500" />} onConfirm={submitCaveats} onClose={() => setModal({ type: "none" })} loading={busy} />}
+      {modal.type === "reject" && <TextModal title={modal.groupId ? "Rejeitar Lote" : "Rejeitar Reserva"} subtitle="Informe o motivo da rejeição — ele será exibido ao professor." placeholder="Ex: Laboratório indisponível no período solicitado." confirmLabel="Confirmar Rejeição" confirmClass="bg-red-500 hover:bg-red-600" icon={<XCircle size={20} className="text-red-500" />} onConfirm={submitReject} onClose={() => setModal({ type: "none" })} loading={busy} />}
+      {modal.type === "sw" && <SwModal labName={modal.labName} professor={modal.professor} softwares={modal.softwares} onConfirm={submitSW} onClose={() => setModal({ type: "none" })} loading={busy} />}
 
-      {/* ── Banner de conflito de agenda ── */}
       {conflictWarning && (
         <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
           <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
@@ -543,41 +449,27 @@ export function ReservationPageDTI() {
             <p className="text-sm font-bold text-red-800">Conflito de Agenda Detectado</p>
             <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
           </div>
-          <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 shrink-0 mt-0.5">
-            <X size={18} />
-          </button>
+          <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 shrink-0 mt-0.5"><X size={18} /></button>
         </div>
       )}
 
-      {/* ── Cabeçalho ── */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-neutral-900">
-            {canApprove ? "Gerenciar Solicitações" : "Solicitações de Reserva"}
-          </h2>
-          <p className="text-sm text-neutral-500 mt-1">
-            {canApprove
-              ? "Aprove, rejeite e acompanhe os agendamentos. Ações disponíveis em cada linha."
-              : "Visualize as solicitações de reserva em andamento."}
-          </p>
+          <h2 className="text-2xl font-bold text-neutral-900">{canApprove ? "Gerenciar Solicitações" : "Solicitações de Reserva"}</h2>
+          <p className="text-sm text-neutral-500 mt-1">{canApprove ? "Aprove, rejeite e acompanhe os agendamentos. Ações disponíveis em cada linha." : "Visualize as solicitações de reserva em andamento."}</p>
         </div>
-        <button onClick={() => setViewMode("timetable")}
-          className="bg-white border border-neutral-200 text-neutral-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-50 transition-colors shadow-sm self-start">
+        <button onClick={() => setViewMode("timetable")} className="bg-white border border-neutral-200 text-neutral-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-50 transition-colors shadow-sm self-start">
           <Search size={18} /> Verificar Grade
         </button>
       </div>
 
-      {/* ── Banner somente-leitura ── */}
       {!canApprove && (
         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3">
           <Eye size={18} className="text-blue-500 shrink-0" />
-          <p className="text-sm font-medium text-blue-700">
-            Você está no <span className="font-bold">modo de visualização</span>. Estagiários DTI não possuem permissão para aprovar ou rejeitar reservas.
-          </p>
+          <p className="text-sm font-medium text-blue-700">Você está no <span className="font-bold">modo de visualização</span>. Estagiários DTI não possuem permissão para aprovar ou rejeitar reservas.</p>
         </div>
       )}
 
-      {/* ── Filtros de status ── */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {[
           { value: ReservationStatus.PENDENTE,               label: "Pendentes" },
@@ -586,15 +478,46 @@ export function ReservationPageDTI() {
           { value: "all",                                    label: "Todas Ativas" },
           { value: ReservationStatus.APROVADO,               label: "Aprovadas" },
         ].map(s => (
-          <button key={s.value} onClick={() => { setFilter(s.value); setVisibleCount(ITEMS_PER_PAGE); }}
-            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${
-              filter === s.value
-                ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
-                : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"
-            }`}>
+          <button key={s.value} onClick={() => { setFilter(s.value); setFilterBlock(""); setFilterLab(""); setVisibleCount(ITEMS_PER_PAGE); }}
+            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${filter === s.value ? "bg-neutral-900 text-white border-neutral-900 shadow-sm" : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"}`}>
             {s.label}
           </button>
         ))}
+      </div>
+
+      {/* ── Barra de filtros avançados UI/UX Refinada ── */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+          <input type="text" value={searchProf} onChange={e => { setSearchProf(e.target.value); setVisibleCount(ITEMS_PER_PAGE); }} placeholder="Buscar professor…" className="w-full pl-8 pr-3 py-2 text-sm font-medium border border-neutral-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-neutral-300 placeholder:text-neutral-400 shadow-sm transition-shadow" />
+        </div>
+
+        {/* Aplicando CustomDropdown nos filtros */}
+        <CustomDropdown 
+          value={filterBlock} 
+          options={[{ value: "", label: "Todos os blocos" }, ...blockOptions.map(b => ({ value: b, label: b }))]} 
+          onChange={v => { setFilterBlock(v); setFilterLab(""); setVisibleCount(ITEMS_PER_PAGE); }} 
+          icon={Building2} 
+          placeholder="Bloco" 
+        />
+        <CustomDropdown 
+          value={filterLab} 
+          options={[{ value: "", label: "Todos os laboratórios" }, ...labOptions.map(l => ({ value: l, label: l }))]} 
+          onChange={v => { setFilterLab(v); setVisibleCount(ITEMS_PER_PAGE); }} 
+          icon={Monitor} 
+          placeholder="Laboratório" 
+        />
+
+        <button onClick={() => { setSortOrder(v => v === "desc" ? "asc" : "desc"); setVisibleCount(ITEMS_PER_PAGE); }} title={sortOrder === "desc" ? "Mais recente primeiro" : "Mais antigo primeiro"} className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold border border-neutral-200 rounded-xl bg-white text-neutral-700 hover:bg-neutral-50 shadow-sm transition-all active:scale-[0.98] whitespace-nowrap">
+          {sortOrder === "desc" ? <SortDesc size={15} /> : <SortAsc size={15} />}
+          {sortOrder === "desc" ? "Mais recente" : "Mais antigo"}
+        </button>
+
+        {(filterBlock || filterLab || searchProf) && (
+          <button onClick={() => { setFilterBlock(""); setFilterLab(""); setSearchProf(""); setVisibleCount(ITEMS_PER_PAGE); }} className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold border border-red-200 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
+            <X size={14} /> Limpar
+          </button>
+        )}
       </div>
 
       {/* ── Tabela ── */}

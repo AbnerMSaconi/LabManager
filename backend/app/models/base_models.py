@@ -16,7 +16,8 @@ class UserRole(enum.Enum):
     DTI_ESTAGIARIO = "dti_estagiario"
     DTI_TECNICO    = "dti_tecnico"
     PROGEX         = "progex"
-    ADMINISTRADOR   = "administrador"
+    ADMINISTRADOR  = "administrador"
+    SUPER_ADMIN    = "super_admin"
 
 class ReservationStatus(enum.Enum):
     PENDENTE               = "pendente"
@@ -53,8 +54,9 @@ class User(Base):
     registration_number: Mapped[str]  = mapped_column(String(50), unique=True, index=True)
     hashed_password:     Mapped[str]  = mapped_column(String(255))
     full_name:           Mapped[str]  = mapped_column(String(255))
-    role:                Mapped[str]  = mapped_column(String(30), default="professor")
-    is_active:           Mapped[bool] = mapped_column(default=True)
+    role:                Mapped[str]           = mapped_column(String(30), default="professor")
+    is_active:           Mapped[bool]          = mapped_column(default=True)
+    deleted_at:          Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class LessonSlot(Base):
@@ -75,6 +77,7 @@ class Laboratory(Base):
     is_practical: Mapped[bool]          = mapped_column(default=False)
     description:  Mapped[Optional[str]] = mapped_column(Text)
     is_active:    Mapped[bool]          = mapped_column(default=True)
+    deleted_at:   Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     softwares: Mapped[List["Software"]] = relationship(secondary="lab_softwares", back_populates="laboratories")
     hardwares: Mapped[List["Hardware"]] = relationship(secondary="lab_hardwares", back_populates="laboratories")
 
@@ -83,7 +86,8 @@ class Software(Base):
     __tablename__ = "softwares"
     id:      Mapped[int]           = mapped_column(primary_key=True)
     name:    Mapped[str]           = mapped_column(String(100))
-    version: Mapped[Optional[str]] = mapped_column(String(50))
+    version:    Mapped[Optional[str]]      = mapped_column(String(50))
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     laboratories: Mapped[List["Laboratory"]] = relationship(secondary="lab_softwares", back_populates="softwares")
 
 
@@ -115,6 +119,9 @@ class ItemModel(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     image_url:   Mapped[Optional[str]] = mapped_column(String(512))
     total_stock: Mapped[int]           = mapped_column(Integer, default=0)
+    physical_items: Mapped[List["PhysicalItem"]] = relationship(back_populates="model")
+    maintenance_stock: Mapped[int]          = mapped_column(Integer, server_default="0", default=0)
+    deleted_at:        Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     physical_items: Mapped[List["PhysicalItem"]] = relationship(back_populates="model")
 
 
@@ -221,3 +228,25 @@ class InventoryMovement(Base):
 
     model:    Mapped["ItemModel"] = relationship(foreign_keys=[item_model_id])
     operator: Mapped["User"]      = relationship(foreign_keys=[operator_id])
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id:         Mapped[int]           = mapped_column(primary_key=True)
+    table_name: Mapped[str]           = mapped_column(String(100))
+    record_id:  Mapped[int]           = mapped_column(Integer)
+    old_data:   Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # JSON serializado
+    new_data:   Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # JSON serializado
+    user_id:    Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
+    author:     Mapped[Optional["User"]] = relationship(foreign_keys=[user_id])
+
+
+class SystemBackup(Base):
+    __tablename__ = "system_backups"
+    id:               Mapped[int]             = mapped_column(primary_key=True)
+    filename:         Mapped[str]             = mapped_column(String(255))
+    created_at:       Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow)
+    size_mb:          Mapped[Optional[float]] = mapped_column(nullable=True)
+    triggered_by_id:  Mapped[Optional[int]]   = mapped_column(ForeignKey("users.id"), nullable=True)
+    triggered_by:     Mapped[Optional["User"]] = relationship(foreign_keys=[triggered_by_id])

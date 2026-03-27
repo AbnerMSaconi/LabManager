@@ -1,6 +1,6 @@
 """
 SSE — Server-Sent Events
-Transmite eventos em tempo real para todos os clientes conectados.
+Transmite eventos em tempo real para clientes conectados.
 
 Nota: requer --workers 1 no Gunicorn, pois asyncio.Queue não atravessa processos.
 """
@@ -24,39 +24,61 @@ router = APIRouter(prefix="/api/v1", tags=["events"])
 # ---------------------------------------------------------------------------
 
 class SSEManager:
-    """Mantém uma fila asyncio por cliente conectado."""
+    """Mantém uma lista de filas asyncio por user_id conectado."""
 
     def __init__(self) -> None:
-        self._queues: list[asyncio.Queue] = []
+        self._queues: dict[int, list[asyncio.Queue]] = {}
 
-    async def subscribe(self) -> asyncio.Queue:
+    async def subscribe(self, user_id: int) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=50)
-        self._queues.append(q)
+        self._queues.setdefault(user_id, []).append(q)
         return q
 
-    def unsubscribe(self, q: asyncio.Queue) -> None:
+    def unsubscribe(self, user_id: int, q: asyncio.Queue) -> None:
+        queues = self._queues.get(user_id, [])
         try:
-            self._queues.remove(q)
+            queues.remove(q)
         except ValueError:
             pass
+        if not queues:
+            self._queues.pop(user_id, None)
+
+    def _put(self, q: asyncio.Queue, msg: str) -> None:
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass  # cliente lento — descarta
 
     async def broadcast(self, event_type: str, payload: dict = {}) -> None:
+        """Envia para TODOS os clientes conectados."""
         if not self._queues:
             return
         msg = json.dumps({"type": event_type, "payload": payload})
-        for q in list(self._queues):
-            try:
-                q.put_nowait(msg)
-            except asyncio.QueueFull:
-                pass  # cliente lento — descarta
+        for queues in list(self._queues.values()):
+            for q in queues:
+                self._put(q, msg)
+
+    async def send_to_users(self, user_ids: list[int], event_type: str, payload: dict = {}) -> None:
+        """Envia apenas para os user_ids especificados."""
+        if not user_ids or not self._queues:
+            return
+        msg = json.dumps({"type": event_type, "payload": payload})
+        for uid in user_ids:
+            for q in list(self._queues.get(uid, [])):
+                self._put(q, msg)
 
 
 sse_manager = SSEManager()
 
 
 async def broadcast(event_type: str, payload: dict = {}) -> None:
-    """Atalho para os route handlers emitirem eventos SSE."""
+    """Atalho: envia para todos os clientes conectados."""
     await sse_manager.broadcast(event_type, payload)
+
+
+async def send_to_users(user_ids: list[int], event_type: str, payload: dict = {}) -> None:
+    """Atalho: envia apenas para os user_ids especificados."""
+    await sse_manager.send_to_users(user_ids, event_type, payload)
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +106,7 @@ async def event_stream(
         raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo.")
 
     async def generator() -> AsyncGenerator[str, None]:
-        q = await sse_manager.subscribe()
+        q = await sse_manager.subscribe(user_id)
         try:
             # Evento de conexão confirmada
             yield f"data: {json.dumps({'type': 'connected', 'payload': {'user_id': user_id}})}\n\n"
@@ -98,7 +120,7 @@ async def event_stream(
         except asyncio.CancelledError:
             pass
         finally:
-            sse_manager.unsubscribe(q)
+            sse_manager.unsubscribe(user_id, q)
 
     return StreamingResponse(
         generator(),

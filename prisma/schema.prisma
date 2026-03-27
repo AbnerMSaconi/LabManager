@@ -52,7 +52,6 @@ enum ItemStatus {
 model User {
   id                 Int           @id @default(autoincrement())
   registrationNumber String        @unique // RA (aluno) ou RF (funcionário)
-  email              String?       @unique
   hashedPassword     String
   fullName           String
   role               UserRole      @default(PROFESSOR)

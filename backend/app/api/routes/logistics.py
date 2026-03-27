@@ -14,8 +14,8 @@ from ...schemas.reservation_schemas import (
 
 router = APIRouter(prefix="/api/v1/logistics", tags=["logística"])
 
-_ALL_DTI = [UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR]
-_MANAGERS = [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR]
+_ALL_DTI = [UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
+_MANAGERS = [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
 
 
 @router.post("/checkout")
@@ -87,6 +87,14 @@ async def checkin_items(
         res_item.damage_observation = item_in.damage_observation
         if item_in.quantity_returned is not None:
             res_item.quantity_returned = item_in.quantity_returned
+
+        qty_returned = item_in.quantity_returned if item_in.quantity_returned is not None else res_item.quantity_requested
+        model = db.query(ItemModel).filter(ItemModel.id == res_item.item_model_id).first()
+        if model:
+            if status_val == ItemStatus.MANUTENCAO.value:
+                model.maintenance_stock += qty_returned
+            elif status_val == ItemStatus.BAIXADO.value:
+                model.total_stock = max(0, model.total_stock - qty_returned)
 
         qty_returned = item_in.quantity_returned if item_in.quantity_returned is not None else res_item.quantity_requested
         prof_name = reservation.user.full_name if reservation.user else f"Usuário #{reservation.user_id}"
@@ -192,12 +200,25 @@ async def return_institution_loan(
     if payload.has_damage and not payload.damage_observation:
         raise HTTPException(status_code=400, detail="Descreva a avaria ocorrida.")
 
+    # 1. Define a quantidade primeiro para evitar o UnboundLocalError
     qty_ret = payload.quantity_returned if not payload.all_returned else loan.quantity_delivered
+    
+    # 2. Atualiza os dados do empréstimo
     loan.quantity_returned = qty_ret
     loan.damage_observation = payload.damage_observation if payload.has_damage else None
     loan.is_operational = payload.is_operational if payload.has_damage else None
     loan.returned_at = _dt.utcnow()
     loan.status = "devolvido_com_avaria" if payload.has_damage else "devolvido"
+    
+    # 3. A lógica nova: Subtrai do inventário se voltou não operante
+    if payload.has_damage and payload.is_operational is False:
+        model = db.query(ItemModel).filter(ItemModel.id == loan.item_model_id).first()
+        if model:
+            # Soma ao estoque de manutenção. A propriedade available_qty 
+            # já irá subtrair esse valor matematicamente.
+            model.maintenance_stock += qty_ret
+
+    # 4. Registra o movimento de entrada
     obs = payload.damage_observation if payload.has_damage else None
     db.add(InventoryMovement(
         item_model_id=loan.item_model_id,

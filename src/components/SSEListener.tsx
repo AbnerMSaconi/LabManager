@@ -17,6 +17,17 @@ const EVENT_NOTIF_MAP: Record<string, { key: NotifKey; type: ToastType }> = {
   LOAN_RETURNED:       { key: "loan_returned",       type: "success" },
 };
 
+/** Retorna true se o evento de reserva é relevante para o usuário atual.
+ *  Professores só recebem notificação das próprias reservas.
+ *  DTI/PROGEX/Admin recebem todas. */
+function isReservationEventRelevant(eventType: string, payload: Record<string, unknown>, userId: number, role: UserRole): boolean {
+  if (eventType !== "RESERVATION_CREATED" && eventType !== "RESERVATION_UPDATED") return true;
+  if (role === UserRole.PROFESSOR) {
+    return payload.professor_id === userId;
+  }
+  return true;
+}
+
 export function SSEListener() {
   // 1. Pegamos o 'user' apenas para saber se a tela atual está logada
   const { user } = useAuth();
@@ -52,7 +63,10 @@ export function SSEListener() {
         window.dispatchEvent(new CustomEvent("sse-update", { detail: data }));
         const mapping = EVENT_NOTIF_MAP[data.type];
         if (mapping && user) {
-          const prefs = getNotifPrefs(user.id, user.role as UserRole);
+          const role = user.role as UserRole;
+          const relevant = isReservationEventRelevant(data.type, data.payload ?? {}, user.id, role);
+          if (!relevant) return;
+          const prefs = getNotifPrefs(user.id, role);
           if (prefs[mapping.key]) {
             setNotif({ message: NOTIF_LABELS[mapping.key], type: mapping.type });
           }

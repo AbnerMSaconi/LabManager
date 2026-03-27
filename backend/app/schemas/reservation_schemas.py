@@ -1,6 +1,11 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import date, datetime
 from typing import List, Optional
+
+# Alias to avoid Pydantic v2 field-name/type-name collision in ReservationUpdate
+# (Python 3.12 + Pydantic v2 resolves 'date' in Optional[date] using the class
+# namespace where the field default 'date=None' shadows the datetime.date class)
+_DateType = date
 from ..models.base_models import UserRole, ReservationStatus, ItemCategory, ItemStatus
 
 # --- SCHEMAS DE RESERVA ---
@@ -178,10 +183,12 @@ class ItemModelUpdate(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     total_stock: Optional[int] = Field(ge=0, default=None)
-
+    maintenance_stock: Optional[int] = Field(ge=0, default=None)
+    
 
 class AddReservationItemsRequest(BaseModel):
     items: List[ReservationItemBase] = Field(..., min_length=1)
+    
 
 
 class InstitutionLoanCreate(BaseModel):
@@ -198,3 +205,24 @@ class InstitutionLoanReturn(BaseModel):
     has_damage: bool = False
     is_operational: Optional[bool] = None
     damage_observation: Optional[str] = None
+
+class ReservationUpdate(BaseModel):
+    lab_id: Optional[int] = None
+    date: Optional[_DateType] = None
+    slot_ids: Optional[List[int]] = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def coerce_empty_date(cls, v: object) -> object:
+        """Pydantic v2 rejeita string vazia para date; converte para None."""
+        if v == "" or v == "null":
+            return None
+        return v
+
+    @field_validator("lab_id", mode="before")
+    @classmethod
+    def coerce_zero_lab(cls, v: object) -> object:
+        """0 não é um lab_id válido; converte para None."""
+        if v == 0:
+            return None
+        return v

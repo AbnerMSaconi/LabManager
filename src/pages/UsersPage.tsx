@@ -14,6 +14,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.DTI_TECNICO]:    "DTI Técnico",
   [UserRole.PROGEX]:         "Progex (Admin)",
   [UserRole.ADMINISTRADOR]:  "Administrador",
+  [UserRole.SUPER_ADMIN]:    "Super Administrador",
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
@@ -22,6 +23,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.DTI_TECNICO]:    "bg-purple-50 text-purple-700",
   [UserRole.PROGEX]:         "bg-emerald-50 text-emerald-700",
   [UserRole.ADMINISTRADOR]:  "bg-red-50 text-red-700",
+  [UserRole.SUPER_ADMIN]:    "bg-gray-900 text-white",
 };
 
 // Legenda de permissões por papel
@@ -46,6 +48,10 @@ const PERMISSIONS: Record<UserRole, { can: string[]; cannot: string[] }> = {
     can: ["Acesso total ao sistema", "Criar e desativar usuários", "Gerenciar laboratórios", "Todas as operações"],
     cannot: [],
   },
+  [UserRole.SUPER_ADMIN]: {
+    can: ["Acesso irrestrito ao sistema", "Painel de governança", "Reset semestral", "Auditoria e backups"],
+    cannot: [],
+  },
 };
 
 interface UserFormProps {
@@ -53,9 +59,10 @@ interface UserFormProps {
   onSave: (p: CreateUserPayload | UpdateUserPayload) => Promise<void>;
   onCancel: () => void;
   isEdit?: boolean;
+  currentUser?: { role: UserRole } | null;
 }
 
-function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
+function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormProps) {
   const [form, setForm] = useState({
     registration_number: initial?.registration_number ?? "",
     full_name: initial?.full_name ?? "",
@@ -105,9 +112,12 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Papel / Permissões</label>
         <select value={form.role} onChange={e => set("role", e.target.value)}
           className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-neutral-900 outline-none text-sm">
-          {Object.values(UserRole).map(r => (
+          {Object.values(UserRole).filter(r => r !== UserRole.SUPER_ADMIN).map(r => (
             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
           ))}
+          {currentUser?.role === UserRole.SUPER_ADMIN && (
+            <option value={UserRole.SUPER_ADMIN}>Super Administrador</option>
+          )}
         </select>
         {/* Legenda de permissões dinâmica */}
         <div className="mt-2 p-3 bg-neutral-50 rounded-xl text-xs space-y-1">
@@ -152,8 +162,8 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<UserFull | null>(null);
   const [showPermissions, setShowPermissions] = useState(false);
 
-  const canManage = me?.role === UserRole.PROGEX || me?.role === UserRole.DTI_TECNICO || me?.role === UserRole.ADMINISTRADOR;
-  const canDeactivate = me?.role === UserRole.PROGEX;
+  const canManage = me?.role === UserRole.PROGEX || me?.role === UserRole.DTI_TECNICO || me?.role === UserRole.ADMINISTRADOR || me?.role === UserRole.SUPER_ADMIN;
+  const canDeactivate = me?.role === UserRole.PROGEX || me?.role === UserRole.SUPER_ADMIN;
 
   const handleCreate = async (payload: any) => {
     try {
@@ -236,6 +246,7 @@ export function UsersPage() {
               isEdit={!!editTarget}
               onSave={editTarget ? handleUpdate : handleCreate}
               onCancel={() => { setShowForm(false); setEditTarget(null); }}
+              currentUser={me}
             />
           </div>
         </div>
