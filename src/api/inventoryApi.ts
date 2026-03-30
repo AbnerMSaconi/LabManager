@@ -24,9 +24,17 @@ export interface ItemModelPayload {
   name: string;
   category: string;
   description?: string;
+  model_number?: string;
   image_url?: string;
   total_stock: number;
   maintenance_stock?: number;
+}
+
+export interface ImportedItem {
+  name: string;
+  category: string;
+  model_number: string;
+  total_stock: number;
 }
 
 export interface LoanCreatePayload {
@@ -66,6 +74,13 @@ export const inventoryApi = {
   checkin:        (payload: CheckinPayload)  => api.post<{ message: string }>("/api/v1/logistics/checkin", payload),
   listStock:      ()                         => api.get<StockItem[]>("/api/v1/inventory/stock"),
   listMovements:  ()                         => api.get<InventoryMovement[]>("/api/v1/inventory/movements"),
-  resolveMaintenance: (id: number, p: MaintenanceResolvePayload) => 
+  resolveMaintenance: (id: number, p: MaintenanceResolvePayload) =>
   api.post<{ message: string }>(`/api/v1/inventory/item-models/${id}/resolve-maintenance`, p),
+  importPreview: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.postMultipart<{ items: ImportedItem[]; errors: string[]; total: number }>("/api/v1/inventory/import/preview", fd);
+  },
+  importConfirm: (items: ImportedItem[]) =>
+    api.post<{ created: number; skipped: number }>("/api/v1/inventory/import/confirm", { items }),
 };

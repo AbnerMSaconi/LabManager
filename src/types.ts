@@ -29,6 +29,7 @@ export enum ItemCategory {
   ELETRONICA = "eletronica",
   FISICA = "fisica",
   COMPONENTES = "componentes",
+  AUTOMACAO = "automacao",
 }
 
 export enum ItemStatus {
@@ -67,6 +68,7 @@ export interface ItemModel {
   name: string;
   category: ItemCategory;
   description?: string;
+  model_number?: string;
   image_url?: string;
   total_stock: number;
 }

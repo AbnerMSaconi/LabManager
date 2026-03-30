@@ -174,7 +174,8 @@ export function MaintenancePage() {
   const [showNew, setShowNew] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("aberto");
 
-  const canManage = user?.role === UserRole.PROGEX || user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.SUPER_ADMIN;
+  // PROGEX Removido
+  const canManage = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMINISTRADOR;
 
   const handleCreate = async (p: CreateTicketPayload) => {
     try {

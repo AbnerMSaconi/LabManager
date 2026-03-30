@@ -1,6 +1,12 @@
 import { api } from "./client";
 import { Laboratory, LessonSlot, Software } from "../types";
 
+export interface ImportedSoftwareLab {
+  lab_name: string;
+  lab_id: number | null;
+  softwares: string[];
+}
+
 export interface CreateLabPayload {
   name: string;
   block: string;
@@ -39,4 +45,11 @@ export const labsApi = {
   listSoftwares:   ()                              => api.get<Software[]>("/api/v1/softwares"),
   createSoftware:  (name: string, version?: string) => api.post<{ id: number }>("/api/v1/softwares", { name, version }),
   deleteSoftware:  (id: number)                   => api.delete<{ message: string }>(`/api/v1/softwares/${id}`),
+  importSoftwaresPreview: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.postMultipart<{ labs: ImportedSoftwareLab[]; total_softwares: number }>("/api/v1/softwares/import/preview", fd);
+  },
+  importSoftwaresConfirm: (items: ImportedSoftwareLab[]) =>
+    api.post<{ created: number; linked: number }>("/api/v1/softwares/import/confirm", { items }),
 };

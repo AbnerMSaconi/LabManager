@@ -86,3 +86,15 @@ scheduler.start()
 
 import atexit
 atexit.register(lambda: scheduler.shutdown())
+
+
+@app.on_event("startup")
+async def startup_db():
+    from .core.database import engine
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE item_models ADD model_number NVARCHAR(100) NULL"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists

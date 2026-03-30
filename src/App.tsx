@@ -58,7 +58,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.PROFESSOR]:       "Professor",
   [UserRole.DTI_ESTAGIARIO]:  "DTI Estagiário",
   [UserRole.DTI_TECNICO]:     "DTI Técnico",
-  [UserRole.PROGEX]:          "Progex · Admin",
+  [UserRole.PROGEX]:          "Progex",
   [UserRole.ADMINISTRADOR]:   "Administrador",
   [UserRole.SUPER_ADMIN]:     "Super Admin",
 };

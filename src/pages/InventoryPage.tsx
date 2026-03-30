@@ -1,19 +1,19 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   Search, Plus, QrCode, Edit2, Package, CheckCircle2,
-  Calendar, Building2, AlertTriangle, List, LayoutGrid, Wrench, CalendarDays, Filter, X
+  Calendar, Building2, AlertTriangle, List, LayoutGrid, Wrench, CalendarDays, Filter, X, Upload, FileSpreadsheet
 } from "lucide-react";
 import { UserRole, ItemCategory, ItemModel, Reservation, InstitutionLoan, AvailableItemModel, StockItem } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
-import { inventoryApi } from "../api/inventoryApi";
+import { inventoryApi, ImportedItem } from "../api/inventoryApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
-import { CustomDropdown } from "./reservationShared"; // Reutilizando nosso dropdown!
+import { CustomDropdown } from "./reservationShared"; 
 import { ApiError } from "../api/client";
 import { motion } from "motion/react";
 
 const CATEGORY_LABELS: Record<string, string> = {
-  eletrica: "Elétrica", eletronica: "Eletrônica", fisica: "Física", componentes: "Componentes",
+  eletrica: "Elétrica", eletronica: "Eletrônica", fisica: "Física", componentes: "Componentes", automacao: "Automação",
 };
 
 // ── ItemModelFormModal ────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ function ItemModelFormModal({ item, onClose, onSaved }: {
     name: item?.name ?? "",
     category: item?.category ?? "eletrica",
     description: item?.description ?? "",
+    model_number: item?.model_number ?? "",
     image_url: item?.image_url ?? "",
     total_stock: item?.total_stock ?? 0,
     maintenance_stock: (item as any)?.maintenance_stock ?? 0,
@@ -88,6 +89,12 @@ function ItemModelFormModal({ item, onClose, onSaved }: {
             <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Descrição</label>
             <textarea rows={2} className="w-full border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300 resize-none shadow-sm transition-shadow"
               value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Modelo / Referência</label>
+            <input className="w-full border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300 shadow-sm transition-shadow"
+              placeholder="Ex: Arduino Uno R3, 10kΩ..."
+              value={form.model_number} onChange={e => setForm(f => ({ ...f, model_number: e.target.value }))} />
           </div>
           <div>
             <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">URL da Imagem</label>
@@ -678,7 +685,7 @@ function ResolveMaintenanceModal({ item, onClose, onSaved }: {
 
 // ── Maintenance stock ─────────────────────────────────────────────────────────
 
-function MaintenanceStockTab({ onResolve }: { onResolve: (item: StockItem) => void }) {
+function MaintenanceStockTab({ onResolve, canManageItems }: { onResolve: (item: StockItem) => void, canManageItems: boolean }) {
   const { data, loading, error, refetch } = useFetch(inventoryApi.listStock, [], true);
   
   const brokenItems = useMemo(() => (data ?? []).filter((i: StockItem) => i.maintenance_stock > 0), [data]);
@@ -715,10 +722,16 @@ function MaintenanceStockTab({ onResolve }: { onResolve: (item: StockItem) => vo
           </div>
 
           <div className="mt-auto pt-4 border-t border-neutral-100">
-            <button onClick={() => onResolve(item)}
-              className="w-full text-xs bg-neutral-900 text-white py-2.5 rounded-xl hover:bg-neutral-800 transition-all active:scale-[0.98] font-bold shadow-md shadow-neutral-900/20 flex items-center justify-center gap-2">
-              <Wrench size={14} /> Iniciar Manutenção / Baixa
-            </button>
+            {canManageItems ? (
+              <button onClick={() => onResolve(item)}
+                className="w-full text-xs bg-neutral-900 text-white py-2.5 rounded-xl hover:bg-neutral-800 transition-all active:scale-[0.98] font-bold shadow-md shadow-neutral-900/20 flex items-center justify-center gap-2">
+                <Wrench size={14} /> Iniciar Manutenção / Baixa
+              </button>
+            ) : (
+              <div className="w-full text-center text-xs font-bold text-neutral-400 py-2.5 bg-neutral-50 rounded-xl border border-neutral-100">
+                Somente técnicos podem resolver
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -728,12 +741,13 @@ function MaintenanceStockTab({ onResolve }: { onResolve: (item: StockItem) => vo
 
 // ── StockTab ──────────────────────────────────────────────────────────────────
 
-function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLoan }: {
+function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLoan, canManageItems }: {
   search: string; setSearch: (v: string) => void;
   category: string; setCategory: (v: string) => void;
   onEdit: (item: ItemModel) => void;
   onQr: (item: ItemModel) => void;
   onLoan: (item: ItemModel) => void;
+  canManageItems: boolean;
 }) {
   const { data, loading, error, refetch } = useFetch(inventoryApi.listStock, [], true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -809,7 +823,9 @@ function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLo
                     </td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => onEdit(item)} className="p-2.5 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-900 hover:text-white transition-all shadow-sm active:scale-95" title="Editar Informações"><Edit2 size={14}/></button>
+                        {canManageItems && (
+                          <button onClick={() => onEdit(item)} className="p-2.5 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-900 hover:text-white transition-all shadow-sm active:scale-95" title="Editar Informações"><Edit2 size={14}/></button>
+                        )}
                         <button onClick={() => onQr(item)} className="p-2.5 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-900 hover:text-white transition-all shadow-sm active:scale-95" title="Imprimir Etiqueta QR"><QrCode size={14}/></button>
                         <button onClick={() => onLoan(item)} className="p-2.5 rounded-xl border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm active:scale-95" title="Registrar Empréstimo Institucional"><Package size={14}/></button>
                       </div>
@@ -871,10 +887,12 @@ function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLo
                             {item.maintenance_stock > 0 && <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded font-bold tracking-wide shadow-sm">{item.maintenance_stock} avariado</span>}
                           </div>
                         )}
-                        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-neutral-100">
-                          <button onClick={() => onEdit(item)} className="flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
-                            <Edit2 size={16} /> <span className="text-[9px] font-bold uppercase tracking-wider">Editar</span>
-                          </button>
+                        <div className={`grid ${canManageItems ? 'grid-cols-3' : 'grid-cols-2'} gap-2 pt-2 border-t border-neutral-100`}>
+                          {canManageItems && (
+                            <button onClick={() => onEdit(item)} className="flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
+                              <Edit2 size={16} /> <span className="text-[9px] font-bold uppercase tracking-wider">Editar</span>
+                            </button>
+                          )}
                           <button onClick={() => onQr(item)} className="flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
                             <QrCode size={16} /> <span className="text-[9px] font-bold uppercase tracking-wider">Gerar QR</span>
                           </button>
@@ -895,11 +913,158 @@ function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLo
   );
 }
 
+// ── ImportInventoryModal ──────────────────────────────────────────────────────
+
+function ImportInventoryModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const { showToast, ToastComponent } = useToast();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<{ items: ImportedItem[]; errors: string[]; total: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setFile(f);
+    setPreview(null);
+    setStep(1);
+  };
+
+  const handlePreview = async () => {
+    if (!file) { showToast("Selecione um arquivo .xlsx.", "error"); return; }
+    setLoading(true);
+    try {
+      const result = await inventoryApi.importPreview(file);
+      setPreview(result);
+      setStep(2);
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : "Erro ao processar arquivo.", "error");
+    } finally { setLoading(false); }
+  };
+
+  const handleConfirm = async () => {
+    if (!preview?.items.length) return;
+    setConfirming(true);
+    try {
+      const result = await inventoryApi.importConfirm(preview.items);
+      showToast(`Importação concluída: ${result.created} criados, ${result.skipped} ignorados.`, "success");
+      setTimeout(() => { onImported(); onClose(); }, 1000);
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : "Erro ao importar.", "error");
+    } finally { setConfirming(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      {ToastComponent}
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-neutral-900">Importar Inventário via Excel</h2>
+            <p className="text-xs font-medium text-neutral-500 mt-1">
+              {step === 1 ? "Passo 1: Selecione o arquivo .xlsx" : `Passo 2: Confirme os ${preview?.total ?? 0} itens encontrados`}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar space-y-5">
+          {step === 1 && (
+            <>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-neutral-200 rounded-2xl p-10 text-center cursor-pointer hover:border-neutral-400 hover:bg-neutral-50 transition-all"
+              >
+                <FileSpreadsheet size={40} className="mx-auto text-neutral-300 mb-3" />
+                <p className="font-bold text-neutral-700">{file ? file.name : "Clique para selecionar o arquivo"}</p>
+                <p className="text-xs text-neutral-400 mt-1">Formato: .xlsx · Colunas: Equipamentos, Categoria, Modelo, Quantidade</p>
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+              </div>
+              <div className="bg-neutral-50 border border-neutral-100 rounded-xl p-4 text-xs text-neutral-600 space-y-1">
+                <p className="font-bold text-neutral-700 mb-2">Formato esperado da planilha:</p>
+                <p>- Coluna <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Equipamentos</span> ou <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Nome</span> — nome do item</p>
+                <p>- Coluna <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Categoria</span> — Eletrônica, Física, Automação, Elétrica, Componentes</p>
+                <p>- Coluna <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Modelo</span> — referência/modelo (opcional)</p>
+                <p>- Coluna <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Quantidade</span> — estoque total</p>
+              </div>
+            </>
+          )}
+
+          {step === 2 && preview && (
+            <>
+              {preview.errors.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
+                  <p className="text-xs font-bold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertTriangle size={14}/> {preview.errors.length} aviso(s)</p>
+                  {preview.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-amber-700">{err}</p>
+                  ))}
+                </div>
+              )}
+              {preview.items.length === 0 ? (
+                <div className="text-center py-12 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200">
+                  <Package size={36} className="mx-auto text-neutral-300 mb-3" />
+                  <p className="font-bold text-neutral-600">Nenhum item válido encontrado na planilha.</p>
+                </div>
+              ) : (
+                <div className="border border-neutral-200 rounded-2xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-50 border-b border-neutral-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-[11px] font-bold text-neutral-400 uppercase tracking-widest">Nome</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-bold text-neutral-400 uppercase tracking-widest">Categoria</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-bold text-neutral-400 uppercase tracking-widest">Modelo</th>
+                        <th className="px-4 py-3 text-center text-[11px] font-bold text-neutral-400 uppercase tracking-widest">Qtd</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {preview.items.map((item, i) => (
+                        <tr key={i} className="hover:bg-neutral-50/50">
+                          <td className="px-4 py-2.5 font-medium text-neutral-900">{item.name}</td>
+                          <td className="px-4 py-2.5 text-xs text-neutral-500">{CATEGORY_LABELS[item.category] ?? item.category}</td>
+                          <td className="px-4 py-2.5 text-xs text-neutral-500">{item.model_number || "—"}</td>
+                          <td className="px-4 py-2.5 text-center font-bold text-neutral-900">{item.total_stock}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="p-6 bg-neutral-50 border-t border-neutral-100 flex gap-3">
+          {step === 2 && (
+            <button onClick={() => setStep(1)} className="px-4 py-3 border border-neutral-200 rounded-xl text-sm font-bold text-neutral-600 hover:bg-neutral-100 transition-colors bg-white shadow-sm">
+              ← Voltar
+            </button>
+          )}
+          <button onClick={onClose} className="flex-1 py-3 border border-neutral-200 rounded-xl text-sm font-bold text-neutral-600 hover:bg-neutral-100 transition-colors bg-white shadow-sm">Cancelar</button>
+          {step === 1 && (
+            <button onClick={handlePreview} disabled={!file || loading}
+              className="flex-1 bg-neutral-900 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 hover:bg-neutral-800 transition-all active:scale-[0.98] shadow-md shadow-neutral-900/20 flex items-center justify-center gap-2">
+              {loading ? <LoadingSpinner label="" /> : <><Upload size={16}/> Pré-visualizar</>}
+            </button>
+          )}
+          {step === 2 && preview && preview.items.length > 0 && (
+            <button onClick={handleConfirm} disabled={confirming}
+              className="flex-1 bg-neutral-900 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 hover:bg-neutral-800 transition-all active:scale-[0.98] shadow-md shadow-neutral-900/20 flex items-center justify-center gap-2">
+              {confirming ? <LoadingSpinner label="" /> : <><CheckCircle2 size={16}/> Importar {preview.items.length} itens</>}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main InventoryPage ────────────────────────────────────────────────────────
 
 export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) {
   const { user } = useAuth();
   const isProfessor = user?.role === UserRole.PROFESSOR;
+  const canManageItems = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
   const { data, loading, error, refetch } = useFetch(inventoryApi.listModels, [], true);
   const [search, setSearch] = useState("");
@@ -914,6 +1079,7 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
   const [stockKey, setStockKey] = useState(0);
   const [loansKey, setLoansKey] = useState(0);
   const [resolvingMaintenance, setResolvingMaintenance] = useState<StockItem | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const filtered = useMemo(() => (data ?? []).filter(item =>
     item.name.toLowerCase().includes(search.toLowerCase()) && (category === "all" || item.category === category)
@@ -1054,6 +1220,7 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
       {qrItem && <QRCodeModal item={qrItem} onClose={() => setQrItem(null)} />}
       {loanItem && <InstitutionLoanModal item={loanItem} onClose={() => setLoanItem(null)} onSaved={() => { refetch(); setStockKey(k => k + 1); setLoansKey(k => k + 1); }} />}
       {resolvingMaintenance && <ResolveMaintenanceModal item={resolvingMaintenance} onClose={() => setResolvingMaintenance(null)} onSaved={() => { setResolvingMaintenance(null); refetch(); setStockKey(k => k + 1); }} />}
+      {showImport && <ImportInventoryModal onClose={() => setShowImport(false)} onImported={() => { refetch(); setStockKey(k => k + 1); }} />}
       
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 border border-neutral-200 rounded-3xl shadow-sm">
         <div className="flex items-center gap-4">
@@ -1065,10 +1232,15 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
             <p className="text-xs font-medium text-neutral-500 mt-1 uppercase tracking-widest">Painel Logístico DTI</p>
           </div>
         </div>
-        {dtiTab === "stock" && (
-          <button onClick={() => setShowCreate(true)} className="bg-neutral-900 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-800 transition-all active:scale-95 shadow-md shadow-neutral-900/20">
-            <Plus size={18} /> Novo Item
-          </button>
+        {dtiTab === "stock" && canManageItems && (
+          <div className="flex gap-2">
+            <button onClick={() => setShowImport(true)} className="bg-white text-neutral-700 border border-neutral-200 px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-50 transition-all active:scale-95 shadow-sm">
+              <FileSpreadsheet size={18} /> Importar Excel
+            </button>
+            <button onClick={() => setShowCreate(true)} className="bg-neutral-900 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-800 transition-all active:scale-95 shadow-md shadow-neutral-900/20">
+              <Plus size={18} /> Novo Item
+            </button>
+          </div>
         )}
       </header>
 
@@ -1091,11 +1263,12 @@ export function InventoryPage({ onAdd }: { onAdd?: (item: ItemModel) => void }) 
             search={search} setSearch={setSearch}
             category={category} setCategory={setCategory}
             onEdit={setEditingItem} onQr={setQrItem} onLoan={setLoanItem}
+            canManageItems={canManageItems}
           />
         )}
         {dtiTab === "pending" && <PendingRequestsTab />}
         {dtiTab === "loans" && <LoansTab key={loansKey} />}
-        {dtiTab === "maintenance" && <MaintenanceStockTab onResolve={setResolvingMaintenance} />}
+        {dtiTab === "maintenance" && <MaintenanceStockTab onResolve={setResolvingMaintenance} canManageItems={canManageItems} />}
       </div>
     </div>
   );

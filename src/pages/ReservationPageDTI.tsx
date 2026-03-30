@@ -6,13 +6,14 @@ import {
   CheckCircle2, XCircle, Calendar, Layers,
   ChevronDown, ChevronUp, CalendarDays, Search,
   Eye, AlertTriangle, CheckCheck, X, Info, Monitor, MoreHorizontal,
-  SortAsc, SortDesc, Building2, Check
+  SortAsc, SortDesc, Building2, Check, Download
 } from "lucide-react";
-import { UserRole, ReservationStatus, Reservation } from "../types";
+import { UserRole, ReservationStatus, Reservation, Software } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi, ReviewPayload } from "../api/reservationsApi";
 import { maintenanceApi } from "../api/maintenanceApi";
+import { labsApi } from "../api/labsApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
 import { StatusBadge, WEEKDAY_NAMES, TimetableWizard, SoftwareBadge, MaterialsBadge } from "./reservationShared";
 import { ApiError } from "../api/client";
@@ -160,7 +161,60 @@ function SwModal({
   );
 }
 
-// ─── Popover de ações ─────────────────────────────────────────────────────────
+// ─── Modal de Confirmação de Instalação (Catálogo) ───────────────────────────
+function ConfirmInstallModal({ 
+  target, softwares, onClose, onConfirm 
+}: { 
+  target: { id: number | string, requested: string, isGroup: boolean, labName: string }; 
+  softwares: Software[]; onClose: () => void; onConfirm: (ids: number[]) => Promise<void> 
+}) {
+  const [selected, setSelected] = useState<number[]>([]);
+  const [saving, setSaving] = useState(false);
+  const toggle = (id: number) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-lg flex flex-col overflow-hidden shadow-2xl">
+        <div className="px-6 py-5 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-bold text-blue-900">Confirmar Instalação</h3>
+            <p className="text-xs font-bold text-blue-700 mt-0.5 tracking-wide uppercase">{target.labName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 bg-blue-100/50 text-blue-500 hover:bg-blue-200 rounded-full transition-colors"><X size={20}/></button>
+        </div>
+        <div className="p-6 space-y-5 bg-white">
+          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">O professor solicitou:</p>
+            <p className="text-sm font-bold text-amber-900">{target.requested || "Nenhum software específico detalhado."}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-3">O que foi instalado e homologado no laboratório?</p>
+            <div className="max-h-56 overflow-y-auto custom-scrollbar grid grid-cols-2 gap-2 pr-1">
+              {softwares.map(sw => {
+                const sel = selected.includes(sw.id);
+                return (
+                  <button key={sw.id} onClick={() => toggle(sw.id)} className={`px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-start gap-2 ${sel ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-neutral-50 text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:bg-white"}`}>
+                    <div className="mt-0.5 shrink-0">{sel ? <Check size={14} className="text-white"/> : <Monitor size={14} className="text-neutral-400"/>}</div>
+                    <span className="leading-tight">{sw.name} {sw.version ? <span className="block text-[9px] font-medium opacity-70 mt-0.5">v.{sw.version}</span> : ""}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {softwares.length === 0 && <p className="text-xs font-bold text-neutral-400 text-center">Nenhum software cadastrado no catálogo do sistema.</p>}
+          </div>
+        </div>
+        <div className="p-6 border-t border-neutral-100 flex gap-3 bg-neutral-50">
+          <button onClick={onClose} className="flex-1 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-600 hover:bg-neutral-100 transition-all shadow-sm">Cancelar</button>
+          <button onClick={async () => { setSaving(true); await onConfirm(selected); setSaving(false); }} disabled={saving} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-95">
+            {saving ? "Aguarde..." : "Concluir e Aprovar Aula"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Popover de ações (Apenas para aprovação/rejeição) ───────────────────────
 const ACTION_COLORS: Record<string, string> = {
   emerald: "text-emerald-700 hover:bg-emerald-50", amber: "text-amber-700 hover:bg-amber-50",
   purple: "text-purple-700 hover:bg-purple-50", red: "text-red-600 hover:bg-red-50", blue: "text-blue-700 hover:bg-blue-50",
@@ -169,10 +223,10 @@ const ACTION_COLORS: Record<string, string> = {
 type ActionItem = { label: string; Icon: React.ElementType; color: string; onClick: () => void; };
 
 function ActionPopover({
-  status, hasSW, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
+  status, hasSW, onApprove, onCaveats, onScheduleSW, onReject,
 }: {
   status: ReservationStatus; hasSW: boolean;
-  onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
+  onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onReject: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -193,9 +247,6 @@ function ActionPopover({
     actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
   } else if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
     actions.push({ label: "Confirmar Aprovação", Icon: CheckCheck, color: "emerald", onClick: onApprove });
-    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
-  } else if (status === ReservationStatus.AGUARDANDO_SOFTWARE) {
-    actions.push({ label: "Confirmar Instalação", Icon: CheckCheck, color: "blue", onClick: onConfirmSW });
     actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
   }
 
@@ -251,10 +302,18 @@ function SingleRow({
         {r.approval_notes && <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={r.approval_notes}><Info size={10} /> {r.approval_notes.length > 50 ? r.approval_notes.slice(0, 50) + "…" : r.approval_notes}</p>}
       </td>
       <td className="px-4 py-4"><StatusBadge status={r.status} /></td>
-      <td className="px-4 py-4 text-right">
-        {canApprove && (
-          <ActionPopover status={r.status} hasSW={!!r.requested_softwares && !!r.software_installation_required} onApprove={onApprove} onCaveats={onCaveats} onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject} />
-        )}
+      
+      <td className="px-4 py-4 text-right align-middle">
+        {/* Aqui garantimos que o botão azul aparece 100% das vezes que for AGUARDANDO SOFTWARE nesta tela */}
+        {r.status === ReservationStatus.AGUARDANDO_SOFTWARE ? (
+          <button onClick={onConfirmSW} className="inline-flex whitespace-nowrap items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-md active:scale-95 ml-auto">
+            <Download size={14} /> Concluir Instalação
+          </button>
+        ) : canApprove && (r.status === ReservationStatus.PENDENTE || r.status === ReservationStatus.APROVADO_COM_RESSALVAS) ? (
+          <ActionPopover status={r.status} hasSW={!!r.requested_softwares && !!r.software_installation_required} onApprove={onApprove} onCaveats={onCaveats} onScheduleSW={onScheduleSW} onReject={onReject} />
+        ) : r.status === ReservationStatus.PENDENTE && !canApprove ? (
+          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200 whitespace-nowrap">Em Avaliação</span>
+        ) : null}
       </td>
     </tr>
   );
@@ -320,10 +379,18 @@ function GroupRow({
         {first.approval_notes && <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={first.approval_notes}><Info size={10} /> {first.approval_notes.length > 50 ? first.approval_notes.slice(0, 50) + "…" : first.approval_notes}</p>}
       </td>
       <td className="px-4 py-4"><StatusBadge status={first.status} /></td>
-      <td className="px-4 py-4 text-right">
-        {canApprove && (
-          <ActionPopover status={first.status} hasSW={!!first.requested_softwares && !!first.software_installation_required} onApprove={onApprove} onCaveats={onCaveats} onScheduleSW={onScheduleSW} onConfirmSW={onConfirmSW} onReject={onReject} />
-        )}
+      
+      <td className="px-4 py-4 text-right align-middle">
+        {/* A mesma trava direta e garantida para os lotes */}
+        {first.status === ReservationStatus.AGUARDANDO_SOFTWARE ? (
+          <button onClick={onConfirmSW} className="inline-flex whitespace-nowrap items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-md active:scale-95 ml-auto">
+            <Download size={14} /> Concluir Instalação
+          </button>
+        ) : canApprove && (first.status === ReservationStatus.PENDENTE || first.status === ReservationStatus.APROVADO_COM_RESSALVAS) ? (
+          <ActionPopover status={first.status} hasSW={!!first.requested_softwares && !!first.software_installation_required} onApprove={onApprove} onCaveats={onCaveats} onScheduleSW={onScheduleSW} onReject={onReject} />
+        ) : first.status === ReservationStatus.PENDENTE && !canApprove ? (
+          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200 whitespace-nowrap">Em Avaliação</span>
+        ) : null}
       </td>
     </tr>
   );
@@ -339,10 +406,13 @@ type ModalState =
 
 export function ReservationPageDTI() {
   const { user } = useAuth();
-  const canApprove = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.SUPER_ADMIN;
+  
+  // DTI_ESTAGIARIO não aprova.
+  const canApprove = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
   const { showToast, ToastComponent } = useToast();
   const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
+  const { data: softwaresList } = useFetch(labsApi.listSoftwares, [], true);
 
   const [filter, setFilter]             = useState<string>(ReservationStatus.PENDENTE);
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");
@@ -354,6 +424,7 @@ export function ReservationPageDTI() {
   const [filterBlock, setFilterBlock]   = useState<string>("");
   const [filterLab, setFilterLab]       = useState<string>("");
   const [searchProf, setSearchProf]     = useState<string>("");
+  const [installTarget, setInstallTarget] = useState<{ id: string | number, requested: string, isGroup: boolean, labName: string } | null>(null);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -415,7 +486,6 @@ export function ReservationPageDTI() {
   };
 
   const approve    = (id: number, gid?: string) => run(() => doReview({ status: ReservationStatus.APROVADO }, id, gid), "Reserva aprovada.");
-  const confirmSW  = (id: number, gid?: string) => run(() => doReview({ status: ReservationStatus.APROVADO }, id, gid), "Instalação confirmada. Reserva aprovada.");
   const submitCaveats = (notes: string) => { if (modal.type === "caveats") run(() => doReview({ status: ReservationStatus.APROVADO_COM_RESSALVAS, approval_notes: notes }, modal.id, modal.groupId), "Aprovado com ressalvas. O professor foi notificado."); };
   const submitReject = (reason: string) => { if (modal.type === "reject") run(() => doReview({ status: ReservationStatus.REJEITADO, rejection_reason: reason }, modal.id, modal.groupId), "Reserva rejeitada."); };
 
@@ -431,13 +501,40 @@ export function ReservationPageDTI() {
     }, "Ticket de instalação criado. Reserva aguardando software.");
   };
 
+  const handleConfirmInstallation = async (software_ids: number[]) => {
+    if (!installTarget) return;
+    setBusy(true);
+    try {
+      if (installTarget.isGroup) {
+        await reservationsApi.confirmGroupInstallation(String(installTarget.id), { software_ids });
+      } else {
+        await reservationsApi.confirmInstallation(Number(installTarget.id), { software_ids });
+      }
+      showToast("Instalação concluída e vinculada ao laboratório.", "success");
+      setInstallTarget(null);
+      refetch();
+    } catch (e) { 
+      showToast(e instanceof ApiError ? e.message : "Erro ao confirmar instalação.", "error"); 
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (viewMode === "timetable") return <TimetableWizard onClose={() => setViewMode("list")} />;
 
   return (
     <div className="space-y-6 pb-12">
       {ToastComponent}
 
-      {/* Modais omitidos para brevidade (já estão no código original) */}
+      {installTarget && (
+        <ConfirmInstallModal 
+          target={installTarget} 
+          softwares={softwaresList ?? []} 
+          onClose={() => setInstallTarget(null)} 
+          onConfirm={handleConfirmInstallation} 
+        />
+      )}
+
       {modal.type === "caveats" && <TextModal title="Aprovar com Ressalvas" subtitle="Descreva a ressalva — ela ficará visível ao professor no card da reserva." placeholder="Ex: Laboratório disponível a partir das 14h. Aguarde confirmação do técnico." confirmLabel="Confirmar Aprovação" confirmClass="bg-amber-500 hover:bg-amber-600" icon={<AlertTriangle size={20} className="text-amber-500" />} onConfirm={submitCaveats} onClose={() => setModal({ type: "none" })} loading={busy} />}
       {modal.type === "reject" && <TextModal title={modal.groupId ? "Rejeitar Lote" : "Rejeitar Reserva"} subtitle="Informe o motivo da rejeição — ele será exibido ao professor." placeholder="Ex: Laboratório indisponível no período solicitado." confirmLabel="Confirmar Rejeição" confirmClass="bg-red-500 hover:bg-red-600" icon={<XCircle size={20} className="text-red-500" />} onConfirm={submitReject} onClose={() => setModal({ type: "none" })} loading={busy} />}
       {modal.type === "sw" && <SwModal labName={modal.labName} professor={modal.professor} softwares={modal.softwares} onConfirm={submitSW} onClose={() => setModal({ type: "none" })} loading={busy} />}
@@ -466,7 +563,7 @@ export function ReservationPageDTI() {
       {!canApprove && (
         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3">
           <Eye size={18} className="text-blue-500 shrink-0" />
-          <p className="text-sm font-medium text-blue-700">Você está no <span className="font-bold">modo de visualização</span>. Estagiários DTI não possuem permissão para aprovar ou rejeitar reservas.</p>
+          <p className="text-sm font-medium text-blue-700">Modo Estagiário: Você não possui permissão para aprovar ou rejeitar reservas, mas <span className="font-bold">pode concluir instalações de software</span>.</p>
         </div>
       )}
 
@@ -479,20 +576,19 @@ export function ReservationPageDTI() {
           { value: ReservationStatus.APROVADO,               label: "Aprovadas" },
         ].map(s => (
           <button key={s.value} onClick={() => { setFilter(s.value); setFilterBlock(""); setFilterLab(""); setVisibleCount(ITEMS_PER_PAGE); }}
-            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${filter === s.value ? "bg-neutral-900 text-white border-neutral-900 shadow-sm" : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"}`}>
+            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${filter === s.value ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"}`}>
             {s.label}
           </button>
         ))}
       </div>
 
-      {/* ── Barra de filtros avançados UI/UX Refinada ── */}
+      {/* ── Barra de filtros avançados ── */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
           <input type="text" value={searchProf} onChange={e => { setSearchProf(e.target.value); setVisibleCount(ITEMS_PER_PAGE); }} placeholder="Buscar professor…" className="w-full pl-8 pr-3 py-2 text-sm font-medium border border-neutral-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-neutral-300 placeholder:text-neutral-400 shadow-sm transition-shadow" />
         </div>
 
-        {/* Aplicando CustomDropdown nos filtros */}
         <CustomDropdown 
           value={filterBlock} 
           options={[{ value: "", label: "Todos os blocos" }, ...blockOptions.map(b => ({ value: b, label: b }))]} 
@@ -542,7 +638,7 @@ export function ReservationPageDTI() {
                     <th className="px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider">Horários</th>
                     <th className="px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider text-right w-48">
-                      {canApprove ? "Ações" : ""}
+                      Ações
                     </th>
                   </tr>
                 </thead>
@@ -558,7 +654,7 @@ export function ReservationPageDTI() {
                           onScheduleSW={() => setModal({ type: "sw", id: first.id, groupId: unit.id,
                             labId: first.lab_id, labName: first.laboratory?.name,
                             professor: first.user?.full_name, softwares: first.requested_softwares ?? undefined })}
-                          onConfirmSW={() => confirmSW(first.id, unit.id)}
+                          onConfirmSW={() => setInstallTarget({ id: first.group_id as string, isGroup: true, requested: first.requested_softwares || "", labName: first.laboratory?.name || "Laboratório" })}
                           onReject={() => setModal({ type: "reject", id: first.id, groupId: unit.id })}
                         />
                       );
@@ -571,7 +667,7 @@ export function ReservationPageDTI() {
                         onScheduleSW={() => setModal({ type: "sw", id: r.id,
                           labId: r.lab_id, labName: r.laboratory?.name,
                           professor: r.user?.full_name, softwares: r.requested_softwares ?? undefined })}
-                        onConfirmSW={() => confirmSW(r.id)}
+                        onConfirmSW={() => setInstallTarget({ id: r.id, isGroup: false, requested: r.requested_softwares || "", labName: r.laboratory?.name || "Laboratório" })}
                         onReject={() => setModal({ type: "reject", id: r.id })}
                       />
                     );

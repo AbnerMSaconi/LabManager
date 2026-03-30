@@ -1,14 +1,15 @@
 /**
- * Tela de Reservas — visão do PROGEX (Coordenador de Programa)
+ * Tela de Reservas — visão do PROGEX e Admin
  */
 import React, { useState, useMemo } from "react";
 import {
   CheckCircle2, XCircle, Calendar, Layers, ChevronDown, ChevronUp,
   CalendarDays, Search, AlertTriangle, Clock, Plus, X, List
 } from "lucide-react";
-import { ReservationStatus, Reservation } from "../types";
+import { ReservationStatus, Reservation, UserRole } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
+import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
 import { StatusBadge, WEEKDAY_NAMES, TimetableWizard, SoftwareBadge, MaterialsBadge } from "./reservationShared";
 import { ApiError } from "../api/client";
@@ -21,7 +22,8 @@ function IndicatorsBar({ data }: { data: Reservation[] }) {
   const pendentes      = data.filter(r => r.status === ReservationStatus.PENDENTE).length;
   const aguardandoSoft = data.filter(r => r.status === ReservationStatus.AGUARDANDO_SOFTWARE).length;
   const aprovadas      = data.filter(r => r.status === ReservationStatus.APROVADO || r.status === ReservationStatus.EM_USO).length;
-
+  const { user } = useAuth();
+  const canManageReservation = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
@@ -49,7 +51,7 @@ function IndicatorsBar({ data }: { data: Reservation[] }) {
   );
 }
 
-function TableRow({ r, onApprove, onReject }: { key?: React.Key; r: Reservation; onApprove: (id: number) => void; onReject: (id: number) => void; }) {
+function TableRow({ r, onApprove, onReject, canReview }: { key?: React.Key; r: Reservation; onApprove: (id: number) => void; onReject: (id: number) => void; canReview: boolean }) {
   return (
     <tr className="hover:bg-neutral-50/50 transition-colors border-b border-neutral-100">
       <td className="px-6 py-4">
@@ -75,7 +77,7 @@ function TableRow({ r, onApprove, onReject }: { key?: React.Key; r: Reservation;
       </td>
       <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
       <td className="px-6 py-4 text-right whitespace-nowrap">
-        {r.status === ReservationStatus.PENDENTE && (
+        {r.status === ReservationStatus.PENDENTE && canReview && (
           <div className="flex justify-end gap-2">
             <button onClick={() => onApprove(r.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95 border border-emerald-100" title="Aprovar">
               <CheckCircle2 size={16} />
@@ -85,12 +87,15 @@ function TableRow({ r, onApprove, onReject }: { key?: React.Key; r: Reservation;
             </button>
           </div>
         )}
+        {r.status === ReservationStatus.PENDENTE && !canReview && (
+          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200">Em Avaliação</span>
+        )}
       </td>
     </tr>
   );
 }
 
-function GroupRow({ group, onApproveGroup, onRejectGroup }: { key?: React.Key; group: Reservation[]; onApproveGroup: (gid: string) => void; onRejectGroup: (gid: string) => void; }) {
+function GroupRow({ group, onApproveGroup, onRejectGroup, canReview }: { key?: React.Key; group: Reservation[]; onApproveGroup: (gid: string) => void; onRejectGroup: (gid: string) => void; canReview: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const first = group[0];
   const firstDay = new Date(first.date + "T12:00:00").getDay();
@@ -141,7 +146,7 @@ function GroupRow({ group, onApproveGroup, onRejectGroup }: { key?: React.Key; g
       </td>
       <td className="px-6 py-4"><StatusBadge status={first.status} /></td>
       <td className="px-6 py-4 text-right">
-        {first.status === ReservationStatus.PENDENTE && (
+        {first.status === ReservationStatus.PENDENTE && canReview && (
           <div className="flex justify-end gap-2">
             <button onClick={() => onApproveGroup(first.group_id as string)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 shadow-sm active:scale-95">
               <CheckCircle2 size={14} /> Aprovar Lote
@@ -151,12 +156,16 @@ function GroupRow({ group, onApproveGroup, onRejectGroup }: { key?: React.Key; g
             </button>
           </div>
         )}
+        {first.status === ReservationStatus.PENDENTE && !canReview && (
+          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200">Em Avaliação</span>
+        )}
       </td>
     </tr>
   );
 }
 
 export function ReservationPageProgex({ onNewReservation }: { onNewReservation: () => void }) {
+  const { user } = useAuth();
   const { showToast, ToastComponent } = useToast();
   const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
 
@@ -164,6 +173,9 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [conflictWarning, setConflict]  = useState<string | null>(null);
+
+  // Apenas Admins e Super Admins podem aprovar aqui. O PROGEX perde esse acesso.
+  const canReview = user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -230,7 +242,7 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
           </div>
           <div>
             <h1 className="text-2xl font-black text-neutral-900 tracking-tight">Controle de Reservas</h1>
-            <p className="text-xs font-medium text-neutral-500 mt-1 uppercase tracking-widest">Painel Executivo Progex</p>
+            <p className="text-xs font-medium text-neutral-500 mt-1 uppercase tracking-widest">{user?.role === UserRole.PROGEX ? "Painel do Progex" : "Painel Administrativo"}</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -279,10 +291,10 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {(Object.entries(groups) as [string, Reservation[]][]).map(([gid, group]) => (
-                    <GroupRow key={gid} group={group} onApproveGroup={handleApproveGroup} onRejectGroup={handleRejectGroup} />
+                    <GroupRow key={gid} group={group} onApproveGroup={handleApproveGroup} onRejectGroup={handleRejectGroup} canReview={canReview} />
                   ))}
                   {(singles as Reservation[]).map((r: Reservation) => (
-                    <TableRow key={r.id} r={r} onApprove={handleApprove} onReject={handleReject} />
+                    <TableRow key={r.id} r={r} onApprove={handleApprove} onReject={handleReject} canReview={canReview} />
                   ))}
                 </tbody>
               </table>

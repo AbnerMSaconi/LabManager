@@ -38,6 +38,7 @@ class ItemCategory(enum.Enum):
     ELETRONICA = "eletronica"
     FISICA     = "fisica"
     COMPONENTES = "componentes"
+    AUTOMACAO  = "automacao"
 
 class ItemStatus(enum.Enum):
     DISPONIVEL = "disponivel"
@@ -113,11 +114,12 @@ class LabHardware(Base):
 
 class ItemModel(Base):
     __tablename__ = "item_models"
-    id:          Mapped[int]           = mapped_column(primary_key=True)
-    name:        Mapped[str]           = mapped_column(String(255))
-    category:    Mapped[str]           = mapped_column(String(30))
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    image_url:   Mapped[Optional[str]] = mapped_column(String(512))
+    id:           Mapped[int]           = mapped_column(primary_key=True)
+    name:         Mapped[str]           = mapped_column(String(255))
+    category:     Mapped[str]           = mapped_column(String(30))
+    description:  Mapped[Optional[str]] = mapped_column(Text)
+    model_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    image_url:    Mapped[Optional[str]] = mapped_column(String(512))
     total_stock: Mapped[int]           = mapped_column(Integer, default=0)
     physical_items: Mapped[List["PhysicalItem"]] = relationship(back_populates="model")
     maintenance_stock: Mapped[int]          = mapped_column(Integer, server_default="0", default=0)

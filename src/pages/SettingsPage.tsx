@@ -52,13 +52,6 @@ const ROLE_AVAILABLE_KEYS: Record<UserRole, NotifKey[]> = {
   [UserRole.PROGEX]: [
     "reservation_created",
     "reservation_updated",
-    "maintenance_created",
-    "maintenance_updated",
-    "inventory_updated",
-    "checkout",
-    "checkin",
-    "loan_created",
-    "loan_returned",
   ],
   [UserRole.ADMINISTRADOR]: [
     "reservation_created",
@@ -87,9 +80,6 @@ const ROLE_DEFAULT_ENABLED: Record<UserRole, NotifKey[]> = {
   [UserRole.PROGEX]: [
     "reservation_created",
     "reservation_updated",
-    "maintenance_created",
-    "maintenance_updated",
-    "inventory_updated",
   ],
   [UserRole.ADMINISTRADOR]: [
     "reservation_created",

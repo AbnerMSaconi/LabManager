@@ -7,12 +7,11 @@ import { useFetch } from "../hooks/useFetch";
 import { useToast, LoadingSpinner, ErrorMessage } from "../components/ui";
 import { ApiError } from "../api/client";
 
-// Permissões: PROGEX e DTI_TECNICO gerenciam; DTI_ESTAGIARIO só visualiza
 const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.PROFESSOR]:      "Professor",
   [UserRole.DTI_ESTAGIARIO]: "DTI Estagiário",
   [UserRole.DTI_TECNICO]:    "DTI Técnico",
-  [UserRole.PROGEX]:         "Progex (Admin)",
+  [UserRole.PROGEX]:         "PROGEX", // Alterado
   [UserRole.ADMINISTRADOR]:  "Administrador",
   [UserRole.SUPER_ADMIN]:    "Super Administrador",
 };
@@ -26,7 +25,6 @@ const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.SUPER_ADMIN]:    "bg-gray-900 text-white",
 };
 
-// Legenda de permissões por papel
 const PERMISSIONS: Record<UserRole, { can: string[]; cannot: string[] }> = {
   [UserRole.PROFESSOR]: {
     can: ["Criar reservas", "Ver suas próprias reservas", "Consultar laboratórios", "Ver catálogo do almoxarifado"],
@@ -38,11 +36,11 @@ const PERMISSIONS: Record<UserRole, { can: string[]; cannot: string[] }> = {
   },
   [UserRole.DTI_TECNICO]: {
     can: ["Aprovar e rejeitar reservas", "Fazer checkout e checkin", "Criar e editar usuários", "Abrir e resolver chamados"],
-    cannot: ["Desativar usuários (somente Progex)"],
+    cannot: ["Desativar usuários (somente Admin)"],
   },
   [UserRole.PROGEX]: {
-    can: ["Acesso total ao sistema", "Criar e desativar usuários", "Gerenciar laboratórios", "Solicitar reservas semestrais"],
-    cannot: [],
+    can: ["Registrar e gerenciar Professores", "Solicitar reservas para Professores"],
+    cannot: ["Acesso de administrador", "Gerenciar usuários DTI ou Admins"],
   },
   [UserRole.ADMINISTRADOR]: {
     can: ["Acesso total ao sistema", "Criar e desativar usuários", "Gerenciar laboratórios", "Todas as operações"],
@@ -93,6 +91,15 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
     }
   };
 
+  // Filtrar quais funções o usuário logado pode atribuir
+  const availableRoles = Object.values(UserRole).filter(r => {
+    if (r === UserRole.SUPER_ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) return false;
+    if (currentUser?.role === UserRole.PROGEX) {
+      return r === UserRole.PROFESSOR || r === UserRole.PROGEX;
+    }
+    return true;
+  });
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {!isEdit && (
@@ -112,14 +119,10 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Papel / Permissões</label>
         <select value={form.role} onChange={e => set("role", e.target.value)}
           className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-neutral-900 outline-none text-sm">
-          {Object.values(UserRole).filter(r => r !== UserRole.SUPER_ADMIN).map(r => (
+          {availableRoles.map(r => (
             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
           ))}
-          {currentUser?.role === UserRole.SUPER_ADMIN && (
-            <option value={UserRole.SUPER_ADMIN}>Super Administrador</option>
-          )}
         </select>
-        {/* Legenda de permissões dinâmica */}
         <div className="mt-2 p-3 bg-neutral-50 rounded-xl text-xs space-y-1">
           <p className="font-bold text-neutral-600 mb-1">Permissões deste papel:</p>
           {PERMISSIONS[form.role as UserRole]?.can.map(p => (
@@ -162,8 +165,10 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<UserFull | null>(null);
   const [showPermissions, setShowPermissions] = useState(false);
 
+  // PROGEX continua podendo "Gerenciar", mas o escopo é limitado internamente
   const canManage = me?.role === UserRole.PROGEX || me?.role === UserRole.DTI_TECNICO || me?.role === UserRole.ADMINISTRADOR || me?.role === UserRole.SUPER_ADMIN;
-  const canDeactivate = me?.role === UserRole.PROGEX || me?.role === UserRole.SUPER_ADMIN;
+  // Apenas Admins reais podem desativar usuários agora
+  const canDeactivate = me?.role === UserRole.ADMINISTRADOR || me?.role === UserRole.SUPER_ADMIN;
 
   const handleCreate = async (payload: any) => {
     try {
@@ -200,7 +205,7 @@ export function UsersPage() {
         <div>
           <h2 className="text-2xl font-bold">Gerenciamento de Usuários</h2>
           <p className="text-neutral-500 text-sm">
-            {canManage ? "Crie, edite e gerencie permissões." : "Visualização somente leitura."}
+            {canManage ? "Crie e edite as contas do sistema." : "Visualização somente leitura."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -217,7 +222,6 @@ export function UsersPage() {
         </div>
       </div>
 
-      {/* Painel de permissões */}
       {showPermissions && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.values(UserRole).map(role => (
@@ -236,7 +240,6 @@ export function UsersPage() {
         </div>
       )}
 
-      {/* Modal de criação/edição */}
       {(showForm || editTarget) && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
@@ -268,62 +271,75 @@ export function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {(data ?? []).map(u => (
-                <tr key={u.id} className={`hover:bg-neutral-50 transition-colors ${!u.is_active ? "opacity-50" : ""}`}>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center font-bold text-sm text-neutral-600">
-                        {u.full_name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm">{u.full_name}</p>
-                        <p className="text-xs text-neutral-400 font-mono">{u.registration_number}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-mono text-neutral-600">{u.registration_number}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${ROLE_COLORS[u.role]}`}>
-                      {ROLE_LABELS[u.role]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5">
-                      {u.is_active
-                        ? <><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className="text-xs text-emerald-700 font-medium">Ativo</span></>
-                        : <><div className="w-2 h-2 rounded-full bg-neutral-300"/><span className="text-xs text-neutral-400 font-medium">Inativo</span></>
-                      }
-                    </div>
-                  </td>
-                  {canManage && (
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex gap-1 justify-end">
-                        <button onClick={() => setEditTarget(u)} title="Editar"
-                          className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-lg transition-colors">
-                          <Pencil size={15} />
-                        </button>
-                        {canDeactivate && u.id !== me?.id && (
-                          <button onClick={() => handleToggleActive(u)}
-                            title={u.is_active ? "Desativar" : "Reativar"}
-                            className={`p-2 rounded-lg transition-colors ${u.is_active ? "text-red-400 hover:bg-red-50" : "text-emerald-600 hover:bg-emerald-50"}`}>
-                            {u.is_active ? <UserX size={15} /> : <UserCheck size={15} />}
-                          </button>
-                        )}
-                        {!canDeactivate && (
-                          <div title="Somente Progex pode desativar" className="p-2 text-neutral-200 cursor-not-allowed">
-                            <UserX size={15} />
-                          </div>
-                        )}
+              {(data ?? []).map(u => {
+                // Checa se o usuário atual (PROGEX) tem permissão de editar este registro
+                const canEditUser = me?.role !== UserRole.PROGEX || u.role === UserRole.PROFESSOR || u.role === UserRole.PROGEX;
+
+                return (
+                  <tr key={u.id} className={`hover:bg-neutral-50 transition-colors ${!u.is_active ? "opacity-50" : ""}`}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center font-bold text-sm text-neutral-600">
+                          {u.full_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm">{u.full_name}</p>
+                          <p className="text-xs text-neutral-400 font-mono">{u.registration_number}</p>
+                        </div>
                       </div>
                     </td>
-                  )}
-                  {!canManage && (
-                    <td className="px-6 py-4 text-right">
-                      <Eye size={15} className="text-neutral-300 inline" />
+                    <td className="px-6 py-4 text-sm font-mono text-neutral-600">{u.registration_number}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${ROLE_COLORS[u.role]}`}>
+                        {ROLE_LABELS[u.role]}
+                      </span>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        {u.is_active
+                          ? <><div className="w-2 h-2 rounded-full bg-emerald-500"/><span className="text-xs text-emerald-700 font-medium">Ativo</span></>
+                          : <><div className="w-2 h-2 rounded-full bg-neutral-300"/><span className="text-xs text-neutral-400 font-medium">Inativo</span></>
+                        }
+                      </div>
+                    </td>
+                    {canManage && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex gap-1 justify-end">
+                          
+                          {canEditUser ? (
+                            <button onClick={() => setEditTarget(u)} title="Editar"
+                              className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-lg transition-colors">
+                              <Pencil size={15} />
+                            </button>
+                          ) : (
+                            <div title="Sem permissão para editar" className="p-2 text-neutral-200 cursor-not-allowed">
+                              <Pencil size={15} />
+                            </div>
+                          )}
+
+                          {canDeactivate && u.id !== me?.id && (
+                            <button onClick={() => handleToggleActive(u)}
+                              title={u.is_active ? "Desativar" : "Reativar"}
+                              className={`p-2 rounded-lg transition-colors ${u.is_active ? "text-red-400 hover:bg-red-50" : "text-emerald-600 hover:bg-emerald-50"}`}>
+                              {u.is_active ? <UserX size={15} /> : <UserCheck size={15} />}
+                            </button>
+                          )}
+                          {!canDeactivate && (
+                            <div title="Somente Administradores podem desativar" className="p-2 text-neutral-200 cursor-not-allowed">
+                              <UserX size={15} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                    {!canManage && (
+                      <td className="px-6 py-4 text-right">
+                        <Eye size={15} className="text-neutral-300 inline" />
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

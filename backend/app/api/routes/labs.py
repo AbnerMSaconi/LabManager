@@ -1,5 +1,6 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
+import io
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
@@ -95,7 +96,8 @@ async def get_lab(
 async def create_lab(
     payload: LaboratoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+    # PROGEX Removido
+    current_user: User = Depends(RoleChecker([UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     VALID_BLOCKS = {"Bloco A", "Bloco B", "Bloco C"}
     if payload.block not in VALID_BLOCKS:
@@ -121,7 +123,8 @@ async def update_lab(
     lab_id: int,
     payload: LaboratoryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+    # PROGEX Removido
+    current_user: User = Depends(RoleChecker([UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     lab = db.query(Laboratory).options(joinedload(Laboratory.softwares)).filter(Laboratory.id == lab_id, Laboratory.deleted_at == None).first()
     if not lab:
@@ -171,7 +174,8 @@ async def update_lab(
 async def delete_lab(
     lab_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+    # PROGEX Removido
+    current_user: User = Depends(RoleChecker([UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     lab = db.query(Laboratory).filter(Laboratory.id == lab_id, Laboratory.deleted_at == None).first()
     if not lab:
@@ -201,7 +205,8 @@ async def list_softwares(
 async def create_software(
     payload: SoftwareCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+    # PROGEX Removido
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     sw = SoftwareModel(name=payload.name, version=payload.version)
     db.add(sw)
@@ -214,7 +219,8 @@ async def create_software(
 async def delete_software(
     sw_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+    # PROGEX Removido
+    current_user: User = Depends(RoleChecker([UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
 ):
     sw = db.query(SoftwareModel).filter(SoftwareModel.id == sw_id, SoftwareModel.deleted_at == None).first()
     if not sw:
@@ -222,3 +228,131 @@ async def delete_software(
     sw.deleted_at = func.now()
     db.commit()
     return {"message": "Software movido para a quarentena."}
+
+
+class SoftwareImportConfirmItem(BaseModel):
+    lab_id: Optional[int] = None
+    lab_name: str
+    softwares: List[str]
+
+
+class SoftwareImportConfirmPayload(BaseModel):
+    items: List[SoftwareImportConfirmItem]
+
+
+@router.post("/softwares/import/preview")
+async def import_softwares_preview(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Instale openpyxl: pip install openpyxl")
+
+    content = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+
+    result = []
+
+    # Format 1: tab-per-lab (each sheet name = lab, column "Software" or "Nome" = software names)
+    if len(wb.sheetnames) > 1 or (len(wb.sheetnames) == 1 and wb.sheetnames[0].lower() not in ("sheet1", "sheet", "planilha1", "planilha")):
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            lab_name = sheet_name.strip()
+            # Find software column
+            sw_col_idx = None
+            header_row_idx = None
+            for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+                row_lower = [str(c).strip().lower() if c is not None else "" for c in row]
+                if any(v in ("software", "nome", "name", "softwares") for v in row_lower):
+                    header_row_idx = row_idx
+                    for ci, v in enumerate(row_lower):
+                        if v in ("software", "nome", "name", "softwares"):
+                            sw_col_idx = ci
+                            break
+                    break
+            softwares = []
+            if header_row_idx is not None and sw_col_idx is not None:
+                for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
+                    if row and len(row) > sw_col_idx and row[sw_col_idx]:
+                        sw = str(row[sw_col_idx]).strip()
+                        if sw and sw not in softwares:
+                            softwares.append(sw)
+            elif header_row_idx is None:
+                # No header — assume first column is software names
+                for row in ws.iter_rows(min_row=1, values_only=True):
+                    if row and row[0]:
+                        sw = str(row[0]).strip()
+                        if sw and sw not in softwares:
+                            softwares.append(sw)
+            if softwares:
+                result.append({"lab_name": lab_name, "softwares": softwares, "lab_id": None})
+    else:
+        # Format 2: single sheet with lab names as column headers
+        ws = wb.active
+        header_row_idx = None
+        lab_columns = {}  # col_index -> lab_name
+
+        for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+            has_lab = any(
+                c and ("laboratório" in str(c).lower() or "lab" in str(c).lower())
+                for c in row if c
+            )
+            if has_lab:
+                header_row_idx = row_idx
+                for ci, cell in enumerate(row):
+                    if cell and str(cell).strip():
+                        lab_columns[ci] = str(cell).strip()
+                break
+
+        if not header_row_idx:
+            raise HTTPException(status_code=400, detail="Planilha inválida. Use abas por laboratório ou cabeçalho com nomes dos labs.")
+
+        lab_softwares = {name: [] for name in lab_columns.values()}
+
+        for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
+            for ci, lab_name in lab_columns.items():
+                if len(row) > ci and row[ci] and str(row[ci]).strip():
+                    sw_name = str(row[ci]).strip()
+                    if sw_name not in lab_softwares[lab_name]:
+                        lab_softwares[lab_name].append(sw_name)
+
+        result = [
+            {"lab_name": lab_name, "softwares": softwares, "lab_id": None}
+            for lab_name, softwares in lab_softwares.items()
+            if softwares
+        ]
+
+    return {"labs": result, "total_softwares": sum(len(x["softwares"]) for x in result)}
+
+
+@router.post("/softwares/import/confirm")
+async def import_softwares_confirm(
+    payload: SoftwareImportConfirmPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    created_sw = 0
+    linked = 0
+
+    for item in payload.items:
+        lab = None
+        if item.lab_id:
+            lab = db.query(Laboratory).filter(Laboratory.id == item.lab_id).first()
+
+        for sw_name in item.softwares:
+            if not sw_name.strip():
+                continue
+            existing = db.query(SoftwareModel).filter(SoftwareModel.name == sw_name).first()
+            if not existing:
+                existing = SoftwareModel(name=sw_name)
+                db.add(existing)
+                db.flush()
+                created_sw += 1
+            if lab and existing not in lab.softwares:
+                lab.softwares.append(existing)
+                linked += 1
+
+    db.commit()
+    return {"created": created_sw, "linked": linked}

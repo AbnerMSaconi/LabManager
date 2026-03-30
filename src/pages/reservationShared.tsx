@@ -13,6 +13,8 @@ import { reservationsApi } from "../api/reservationsApi";
 import { labsApi } from "../api/labsApi";
 import { LoadingSpinner, useToast } from "../components/ui";
 import { ApiError } from "../api/client";
+import { useAuth } from "../hooks/useAuth";
+import { UserRole } from "../types";
 
 // ... [Ocultei as CONSTANTES, TIME_SLOTS, e BADGES para economizar texto aqui, MANTENHA AS MESMAS DO CÓDIGO ORIGINAL!] ...
 
@@ -33,21 +35,48 @@ export const WEEKDAY_NAMES = ["Domingo","Segunda-feira","Terça-feira","Quarta-f
 
 export function StatusBadge({ status }: { status: string }) {
   if (!status) return null;
-  return <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${STATUS_STYLES[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}>{status.replace(/_/g, " ")}</span>;
+  return (
+    <span 
+      className={`inline-flex items-center justify-center whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${STATUS_STYLES[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}
+    >
+      {status.replace(/_/g, " ")}
+    </span>
+  );
 }
-
-export function SoftwareBadge({ softwares, label = "Software" }: { softwares: string; label?: string }) {
+export function SoftwareBadge({ softwares, label = "Software" }: { softwares?: string | null; label?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (!open) return; const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, [open]);
-  const list = softwares.split(",").map(s => s.trim()).filter(Boolean);
+  
+  useEffect(() => { 
+    if (!open) return; 
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; 
+    document.addEventListener("mousedown", h); 
+    return () => document.removeEventListener("mousedown", h); 
+  }, [open]);
+
+  // 👇 Trava de Segurança Adicionada Aqui 👇
+  if (!softwares) return null;
+  const list = String(softwares).split(",").map(s => s.trim()).filter(Boolean);
+  if (list.length === 0) return null;
+  // 👆 Fim da Trava de Segurança 👆
+
   return (
     <div className="relative inline-block" ref={ref}>
-      <button onClick={e => { e.stopPropagation(); setOpen(v => !v); }} className="flex items-center gap-0.5 text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer">{label} <ChevronDown size={9} /></button>
+      <button onClick={e => { e.stopPropagation(); setOpen(v => !v); }} className="flex items-center gap-0.5 text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer">
+        {label} <ChevronDown size={9} />
+      </button>
       {open && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden min-w-[160px]">
-          <div className="bg-purple-50 border-b border-purple-100 px-3 py-2 text-[10px] font-bold text-purple-700 uppercase tracking-widest">Softwares ({list.length})</div>
-          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">{list.map((sw, i) => (<div key={i} className="px-3 py-2 text-xs font-medium text-neutral-700 flex items-center gap-2 hover:bg-neutral-50"><Monitor size={11} className="text-purple-400 flex-shrink-0" />{sw}</div>))}</div>
+          <div className="bg-purple-50 border-b border-purple-100 px-3 py-2 text-[10px] font-bold text-purple-700 uppercase tracking-widest">
+            Softwares ({list.length})
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
+            {list.map((sw, i) => (
+              <div key={i} className="px-3 py-2 text-xs font-medium text-neutral-700 flex items-center gap-2 hover:bg-neutral-50">
+                <Monitor size={11} className="text-purple-400 flex-shrink-0" />{sw}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -217,6 +246,10 @@ export function TimetableWizard({ onClose }: { onClose: () => void }) {
   const { showToast, ToastComponent } = useToast();
   const { data: labs, loading: labsLoading } = useFetch(labsApi.list);
   const { data: allReservations, loading: resLoading, refetch: refetchRes } = useFetch(reservationsApi.listAll, [], true);
+  
+  // 👇 PUXANDO O USUÁRIO LOGADO E DEFININDO A PERMISSÃO
+  const { user } = useAuth();
+  const canManageReservation = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
   const [step, setStep]                             = useState(1);
   const [selectedBlock, setSelectedBlock]           = useState<string | null>(null);
@@ -453,16 +486,29 @@ export function TimetableWizard({ onClose }: { onClose: () => void }) {
                 <div className="flex justify-between items-center pt-3 border-t border-neutral-200/60"><span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Status</span><StatusBadge status={selectedReservation.status} /></div>
               </div>
             </div>
+            
+            {/* 👇 BOTÕES COM TRAVA DE PERMISSÃO 👇 */}
             <div className="p-6 bg-neutral-50 border-t border-neutral-100 flex gap-3">
-              <button onClick={() => { setEditingReservation(selectedReservation); setSelectedReservation(null); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-white text-neutral-700 rounded-xl font-bold hover:bg-neutral-100 border border-neutral-200 transition-colors shadow-sm active:scale-95">
+              <button 
+                onClick={() => { setEditingReservation(selectedReservation); setSelectedReservation(null); }}
+                disabled={!canManageReservation}
+                title={!canManageReservation ? "Você não tem permissão para editar" : ""}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-white text-neutral-700 rounded-xl font-bold hover:bg-neutral-100 border border-neutral-200 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
+              >
                 <Edit size={16} /> Editar
               </button>
-              <button onClick={() => handleDelete(selectedReservation.id)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 border border-red-100 transition-colors shadow-sm active:scale-95">
+              
+              <button 
+                onClick={() => handleDelete(selectedReservation.id)}
+                disabled={!canManageReservation}
+                title={!canManageReservation ? "Você não tem permissão para excluir" : ""}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 border border-red-100 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-50 disabled:active:scale-100 disabled:grayscale"
+              >
                 <Trash2 size={16} /> Excluir
               </button>
             </div>
+            {/* 👆 BOTÕES COM TRAVA DE PERMISSÃO 👆 */}
+            
           </div>
         </div>
       )}

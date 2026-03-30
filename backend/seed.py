@@ -7,7 +7,7 @@ from backend.app.models.base_models import (
     LessonSlot, User, Laboratory, Software, ItemModel,
     Reservation, ReservationSlot, ReservationItem,
     ReservationStatus, PhysicalItem, ItemStatus,
-    InventoryMovement, InstitutionLoan
+    InventoryMovement, InstitutionLoan, TeacherAttendance  # <--- ADICIONADO AQUI
 )
 from passlib.context import CryptContext
 from datetime import date, timedelta
@@ -151,6 +151,7 @@ def seed_data():
         # Limpa reservas existentes para garantir seed idempotente (re-runs não geram conflitos)
         existing_count = db.query(Reservation).count()
         if existing_count > 0:
+            db.query(TeacherAttendance).delete(synchronize_session=False)  # <--- CORREÇÃO AQUI
             db.query(InventoryMovement).delete(synchronize_session=False)
             db.query(InstitutionLoan).delete(synchronize_session=False)
             db.query(ReservationItem).delete(synchronize_session=False)

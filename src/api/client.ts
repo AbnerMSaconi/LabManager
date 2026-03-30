@@ -97,4 +97,33 @@ export const api = {
       headers: { "Content-Type": "application/x-www-form-urlencoded" } as HeadersInit,
       body: form.toString(),
     }),
+
+  postMultipart: <T>(path: string, form: FormData) => {
+    // Do NOT set Content-Type — browser sets it with the multipart boundary automatically
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers,
+      body: form,
+      cache: "no-store",
+    }).then(async res => {
+      if (res.status === 401) {
+        try { localStorage.removeItem("access_token"); } catch {}
+        window.location.href = "/";
+        throw new ApiError(401, "Sessão expirada. Faça login novamente.");
+      }
+      if (!res.ok) {
+        let detail = `Erro ${res.status}`;
+        try {
+          const body = await res.json();
+          if (typeof body.detail === "string") detail = body.detail;
+        } catch (_) {}
+        throw new ApiError(res.status, detail);
+      }
+      if (res.status === 204) return undefined as T;
+      return res.json() as Promise<T>;
+    });
+  },
 };

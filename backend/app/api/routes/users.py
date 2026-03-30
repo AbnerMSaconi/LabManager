@@ -38,6 +38,12 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Registro já cadastrado.")
 
     role_val = payload.role.value if hasattr(payload.role, 'value') else payload.role
+    current_role_val = current_user.role.value if hasattr(current_user.role, 'value') else current_user.role
+
+    # Restrição PROGEX: Só pode criar PROFESSOR ou PROGEX
+    if current_role_val == UserRole.PROGEX.value:
+        if role_val not in [UserRole.PROFESSOR.value, UserRole.PROGEX.value]:
+            raise HTTPException(status_code=403, detail="PROGEX só pode cadastrar Professores ou usuários PROGEX.")
 
     user = User(
         registration_number=payload.registration_number,
@@ -61,10 +67,22 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
-    if payload.full_name  is not None: user.full_name  = payload.full_name
-    if payload.role       is not None:
+    current_role_val = current_user.role.value if hasattr(current_user.role, 'value') else current_user.role
+    target_role_val = user.role.value if hasattr(user.role, 'value') else user.role
+
+    # Restrições PROGEX para atualização
+    if current_role_val == UserRole.PROGEX.value:
+        if target_role_val not in [UserRole.PROFESSOR.value, UserRole.PROGEX.value]:
+            raise HTTPException(status_code=403, detail="Você não tem permissão para alterar este usuário.")
+        if payload.role:
+            new_role_val = payload.role.value if hasattr(payload.role, 'value') else payload.role
+            if new_role_val not in [UserRole.PROFESSOR.value, UserRole.PROGEX.value]:
+                raise HTTPException(status_code=403, detail="PROGEX só pode atribuir os papéis de Professor ou PROGEX.")
+
+    if payload.full_name is not None: user.full_name = payload.full_name
+    if payload.role is not None:
         user.role = payload.role.value if hasattr(payload.role, 'value') else payload.role
-    if payload.is_active  is not None: user.is_active  = payload.is_active
+    if payload.is_active is not None: user.is_active = payload.is_active
     if payload.password:
         user.hashed_password = get_password_hash(payload.password)
 
@@ -75,7 +93,8 @@ async def update_user(
 async def deactivate_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker([UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]))
+    # PROGEX REMOVIDO: Apenas Administradores podem desativar usuários agora
+    current_user: User = Depends(RoleChecker([UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN])) 
 ):
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Você não pode desativar sua própria conta.")

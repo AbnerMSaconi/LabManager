@@ -14,8 +14,11 @@ from ...schemas.reservation_schemas import (
 
 router = APIRouter(prefix="/api/v1/logistics", tags=["logística"])
 
-_ALL_DTI = [UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
-_MANAGERS = [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
+# PROGEX removido do acesso geral da DTI (Checkout / Checkin)
+_ALL_DTI = [UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
+
+# PROGEX e ESTAGIÁRIO removidos do gerenciamento de Empréstimos Institucionais
+_MANAGERS = [UserRole.DTI_TECNICO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN]
 
 
 @router.post("/checkout")
@@ -200,25 +203,19 @@ async def return_institution_loan(
     if payload.has_damage and not payload.damage_observation:
         raise HTTPException(status_code=400, detail="Descreva a avaria ocorrida.")
 
-    # 1. Define a quantidade primeiro para evitar o UnboundLocalError
     qty_ret = payload.quantity_returned if not payload.all_returned else loan.quantity_delivered
     
-    # 2. Atualiza os dados do empréstimo
     loan.quantity_returned = qty_ret
     loan.damage_observation = payload.damage_observation if payload.has_damage else None
     loan.is_operational = payload.is_operational if payload.has_damage else None
     loan.returned_at = _dt.utcnow()
     loan.status = "devolvido_com_avaria" if payload.has_damage else "devolvido"
     
-    # 3. A lógica nova: Subtrai do inventário se voltou não operante
     if payload.has_damage and payload.is_operational is False:
         model = db.query(ItemModel).filter(ItemModel.id == loan.item_model_id).first()
         if model:
-            # Soma ao estoque de manutenção. A propriedade available_qty 
-            # já irá subtrair esse valor matematicamente.
             model.maintenance_stock += qty_ret
 
-    # 4. Registra o movimento de entrada
     obs = payload.damage_observation if payload.has_damage else None
     db.add(InventoryMovement(
         item_model_id=loan.item_model_id,
