@@ -4,8 +4,9 @@
 import React, { useState, useMemo } from "react";
 import {
   CheckCircle2, XCircle, Calendar, Layers, ChevronDown, ChevronUp,
-  CalendarDays, Search, AlertTriangle, Clock, Plus, X, List
+  CalendarDays, Search, AlertTriangle, Clock, Plus, X, List, Monitor, MoreHorizontal
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { ReservationStatus, Reservation, UserRole } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
@@ -16,14 +17,33 @@ import { ApiError } from "../api/client";
 
 const ITEMS_PER_PAGE = 15;
 
-// ─── Indicadores ─────────────────────────────────────────────────────────────
+function isWeeklyCadence(dates: string[]): boolean {
+  if (dates.length < 4) return false;
+  const sorted = [...dates].sort();
+  for (let i = 1; i < sorted.length; i++) {
+    const diff = Math.round(
+      (new Date(sorted[i] + "T12:00:00").getTime() -
+       new Date(sorted[i - 1] + "T12:00:00").getTime()) / 86_400_000
+    );
+    if (diff !== 7) return false;
+  }
+  return true;
+}
+
+function groupLabel(group: Reservation[]) {
+  const dates = group.map(r => r.date);
+  if (isWeeklyCadence(dates)) {
+    const day = new Date(dates[0] + "T12:00:00").getDay();
+    return { type: "semestral" as const, weekday: WEEKDAY_NAMES[day] };
+  }
+  return { type: "pontual" as const };
+}
 
 function IndicatorsBar({ data }: { data: Reservation[] }) {
   const pendentes      = data.filter(r => r.status === ReservationStatus.PENDENTE).length;
   const aguardandoSoft = data.filter(r => r.status === ReservationStatus.AGUARDANDO_SOFTWARE).length;
   const aprovadas      = data.filter(r => r.status === ReservationStatus.APROVADO || r.status === ReservationStatus.EM_USO).length;
-  const { user } = useAuth();
-  const canManageReservation = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
@@ -51,6 +71,64 @@ function IndicatorsBar({ data }: { data: Reservation[] }) {
   );
 }
 
+const ACTION_COLORS: Record<string, string> = {
+  emerald: "text-emerald-700 hover:bg-emerald-50", amber: "text-amber-700 hover:bg-amber-50",
+  purple: "text-purple-700 hover:bg-purple-50", red: "text-red-600 hover:bg-red-50", blue: "text-blue-700 hover:bg-blue-50",
+};
+
+type ActionItem = { label: string; Icon: React.ElementType; color: string; onClick: () => void; };
+
+function ActionPopover({
+  status, hasSW, onApprove, onCaveats, onScheduleSW, onReject,
+}: {
+  status: ReservationStatus; hasSW: boolean;
+  onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onReject: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const actions: ActionItem[] = [];
+
+  if (status === ReservationStatus.PENDENTE) {
+    actions.push({ label: "Aprovar", Icon: CheckCircle2, color: "emerald", onClick: onApprove });
+    actions.push({ label: "Aprovar com Ressalvas", Icon: AlertTriangle, color: "amber", onClick: onCaveats });
+    if (hasSW) actions.push({ label: "Agendar Software", Icon: Monitor, color: "purple", onClick: onScheduleSW });
+    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
+  } else if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
+    actions.push({ label: "Confirmar Aprovação", Icon: CheckCircle2, color: "emerald", onClick: onApprove });
+    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
+  }
+
+  if (actions.length === 0) return null;
+
+  return (
+    <>
+      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-colors bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200 ml-auto`}>
+        <MoreHorizontal size={14} /> Ações
+      </button>
+      
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.2 }} className="bg-white rounded-3xl w-full max-w-xs flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-neutral-900">Ações da Reserva</h3>
+                <button onClick={() => setOpen(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+              </div>
+              <div className="p-5 space-y-3 bg-white">
+                {actions.map(({ label, Icon, color, onClick }) => (
+                  <button key={label} onClick={() => { setOpen(false); onClick(); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left transition-colors border border-neutral-100 bg-neutral-50 ${ACTION_COLORS[color]}`}>
+                    <Icon size={18} /> {label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 function TableRow({ r, onApprove, onReject, canReview }: { key?: React.Key; r: Reservation; onApprove: (id: number) => void; onReject: (id: number) => void; canReview: boolean }) {
   return (
     <tr className="hover:bg-neutral-50/50 transition-colors border-b border-neutral-100">
@@ -71,21 +149,14 @@ function TableRow({ r, onApprove, onReject, canReview }: { key?: React.Key; r: R
       <td className="px-6 py-4">
         <p className="text-sm font-black text-neutral-700">{r.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1.5 mt-1.5 flex-wrap">
-          {r.items && r.items.length > 0 && <MaterialsBadge items={r.items} />}
-          {r.requested_softwares && <SoftwareBadge softwares={r.requested_softwares} />}
+          <MaterialsBadge items={r.items || []} />
+          <SoftwareBadge softwares={r.requested_softwares} label={r.software_installation_required ? "Instalar SW" : "SW Solicitado"} />
         </div>
       </td>
       <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
-      <td className="px-6 py-4 text-right whitespace-nowrap">
+      <td className="px-6 py-4 text-right whitespace-nowrap align-middle">
         {r.status === ReservationStatus.PENDENTE && canReview && (
-          <div className="flex justify-end gap-2">
-            <button onClick={() => onApprove(r.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95 border border-emerald-100" title="Aprovar">
-              <CheckCircle2 size={16} />
-            </button>
-            <button onClick={() => onReject(r.id)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-95 border border-red-100" title="Rejeitar">
-              <XCircle size={16} />
-            </button>
-          </div>
+          <ActionPopover status={r.status} hasSW={!!r.requested_softwares && !!r.software_installation_required} onApprove={() => onApprove(r.id)} onCaveats={() => {}} onScheduleSW={() => {}} onReject={() => onReject(r.id)} />
         )}
         {r.status === ReservationStatus.PENDENTE && !canReview && (
           <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200">Em Avaliação</span>
@@ -96,17 +167,17 @@ function TableRow({ r, onApprove, onReject, canReview }: { key?: React.Key; r: R
 }
 
 function GroupRow({ group, onApproveGroup, onRejectGroup, canReview }: { key?: React.Key; group: Reservation[]; onApproveGroup: (gid: string) => void; onRejectGroup: (gid: string) => void; canReview: boolean }) {
-  const [expanded, setExpanded] = useState(false);
+  const [openDates, setOpenDates] = useState(false);
   const first = group[0];
-  const firstDay = new Date(first.date + "T12:00:00").getDay();
-  const isSemestral = group.every(r => new Date(r.date + "T12:00:00").getDay() === firstDay) && group.length >= 4;
+  const { type, weekday } = groupLabel(group);
+  const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
     <tr className="border-b border-neutral-200 bg-blue-50/20 hover:bg-blue-50/50 transition-colors">
       <td className="px-6 py-4">
         <p className="font-bold text-sm text-neutral-900">{first.user?.full_name}</p>
         <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200 shadow-sm uppercase tracking-wider">
-          <Layers size={10} /> {isSemestral ? "LOTE SEMESTRAL" : "LOTE PONTUAL"} ({group.length})
+          <Layers size={10} /> {type === "semestral" ? "SEMESTRAL" : "LOTE PONTUAL"} ({group.length})
         </span>
       </td>
       <td className="px-6 py-4">
@@ -114,50 +185,67 @@ function GroupRow({ group, onApproveGroup, onRejectGroup, canReview }: { key?: R
         <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-0.5">{first.laboratory?.block}</p>
       </td>
       <td className="px-6 py-4 relative">
-        {isSemestral ? (
+        {type === "semestral" ? (
           <span className="text-sm font-bold text-blue-700 flex items-center gap-2">
-            <CalendarDays size={14} className="text-blue-500" />Toda {WEEKDAY_NAMES[firstDay]}
+            <CalendarDays size={14} className="text-blue-500" />Toda {weekday}
           </span>
         ) : (
-          <div className="relative">
-            <button onClick={() => setExpanded(!expanded)} className="text-xs font-bold text-blue-700 flex items-center gap-1.5 hover:text-blue-900 bg-white px-3 py-2 rounded-xl border border-blue-200 transition-all shadow-sm active:scale-95">
-              <CalendarDays size={14} /> Múltiplas Datas {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <>
+            <button onClick={() => setOpenDates(true)} className="text-xs font-bold text-blue-700 flex items-center gap-1.5 hover:text-blue-900 bg-white px-3 py-2 rounded-xl border border-blue-200 transition-all shadow-sm active:scale-95">
+              <CalendarDays size={14} /> Múltiplas Datas <ChevronDown size={14} />
             </button>
-            <div className={`absolute top-full left-0 z-30 mt-2 bg-white border border-neutral-200 rounded-xl shadow-2xl w-56 overflow-hidden transition-all duration-200 origin-top-left ${expanded ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"}`}>
-              <div className="bg-neutral-50 border-b border-neutral-100 px-3 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Datas Solicitadas</div>
-              <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
-                {group.map(r => (
-                  <div key={r.id} className="text-xs font-bold text-neutral-700 px-3 py-2.5 hover:bg-neutral-50 rounded-lg flex items-center justify-between">
-                    {new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR")}
-                    <StatusBadge status={r.status} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+
+            <AnimatePresence>
+              {openDates && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); setOpenDates(false); }}>
+                  <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.2 }} className="bg-white rounded-3xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                        <CalendarDays size={20} className="text-sky-500" /> Datas Solicitadas
+                      </h3>
+                      <button onClick={() => setOpenDates(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+                    </div>
+                    <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-2 bg-white">
+                      <div className="bg-sky-50 p-4 rounded-2xl border border-sky-100 mb-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700 mb-1">Resumo do Lote</p>
+                        <p className="text-sm font-bold text-sky-900">{group.length} aulas · Laboratório {first.laboratory?.name}</p>
+                      </div>
+                      {sorted.map(r => (
+                        <div key={r.id} className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-neutral-100 bg-neutral-50 hover:bg-neutral-100 transition-colors text-sm font-medium text-neutral-700">
+                          <span className="flex items-center gap-2">
+                            <CalendarDays size={14} className="text-neutral-400" />
+                            {new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+                      <button onClick={() => setOpenDates(false)} className="px-6 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-sm">
+                        Fechar
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
         )}
       </td>
       <td className="px-6 py-4">
         <p className="text-sm font-black text-neutral-700">{first.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1.5 mt-1.5 flex-wrap">
-          {first.items && first.items.length > 0 && <MaterialsBadge items={first.items} />}
-          {first.requested_softwares && <SoftwareBadge softwares={first.requested_softwares} />}
+          <MaterialsBadge items={first.items || []} />
+          <SoftwareBadge softwares={first.requested_softwares} label={first.software_installation_required ? "Instalar SW" : "SW Solicitado"} />
         </div>
       </td>
       <td className="px-6 py-4"><StatusBadge status={first.status} /></td>
-      <td className="px-6 py-4 text-right">
+      <td className="px-6 py-4 text-right align-middle">
         {first.status === ReservationStatus.PENDENTE && canReview && (
-          <div className="flex justify-end gap-2">
-            <button onClick={() => onApproveGroup(first.group_id as string)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 shadow-sm active:scale-95">
-              <CheckCircle2 size={14} /> Aprovar Lote
-            </button>
-            <button onClick={() => onRejectGroup(first.group_id as string)} className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-xl font-bold text-xs hover:bg-red-600 hover:text-white transition-all border border-red-200 shadow-sm active:scale-95">
-              <XCircle size={14} /> Rejeitar Lote
-            </button>
-          </div>
+          <ActionPopover status={first.status} hasSW={!!first.requested_softwares && !!first.software_installation_required} onApprove={() => onApproveGroup(first.group_id as string)} onCaveats={() => {}} onScheduleSW={() => {}} onReject={() => onRejectGroup(first.group_id as string)} />
         )}
         {first.status === ReservationStatus.PENDENTE && !canReview && (
-          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200">Em Avaliação</span>
+          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2 py-1 rounded-md border border-neutral-200 whitespace-nowrap">Em Avaliação</span>
         )}
       </td>
     </tr>
@@ -174,7 +262,7 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [conflictWarning, setConflict]  = useState<string | null>(null);
 
-  // Apenas Admins e Super Admins podem aprovar aqui. O PROGEX perde esse acesso.
+  // Apenas Admins e Super Admins podem aprovar aqui.
   const canReview = user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
   const filtered = useMemo(() => {
@@ -222,18 +310,20 @@ export function ReservationPageProgex({ onNewReservation }: { onNewReservation: 
     <div className="space-y-8 pb-12">
       {ToastComponent}
 
-      {conflictWarning && (
-        <div className="flex items-start gap-4 bg-red-50 border border-red-200 rounded-3xl p-6 shadow-sm">
-          <AlertTriangle size={24} className="text-red-500 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-lg font-black text-red-800 tracking-tight">Conflito de Agenda Detectado</p>
-            <p className="text-sm font-medium text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
-          </div>
-          <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 hover:bg-red-100 p-2 rounded-full transition-colors shrink-0 mt-0.5">
-            <X size={20} />
-          </button>
-        </div>
-      )}
+      <AnimatePresence>
+        {conflictWarning && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="flex items-start gap-4 bg-red-50 border border-red-200 rounded-3xl p-6 shadow-sm overflow-hidden">
+            <AlertTriangle size={24} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-black text-red-800 tracking-tight">Conflito de Agenda Detectado</p>
+              <p className="text-sm font-medium text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
+            </div>
+            <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 hover:bg-red-100 p-2 rounded-full transition-colors shrink-0 mt-0.5">
+              <X size={20} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 border border-neutral-200 rounded-3xl shadow-sm">
         <div className="flex items-center gap-4">

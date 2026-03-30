@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { Plus, Pencil, Trash2, Monitor, X, Check, Building2, AppWindow, FileSpreadsheet, Upload, AlertTriangle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Plus, Pencil, Trash2, Monitor, X, Check, Building2, AppWindow, FileSpreadsheet, Upload, AlertTriangle, Info, Search } from "lucide-react";
 import { UserRole, Laboratory, Software, Reservation } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
@@ -8,6 +8,7 @@ import { reservationsApi } from "../api/reservationsApi";
 import { useToast, LoadingSpinner, ErrorMessage } from "../components/ui";
 import { api as apiClient, ApiError } from "../api/client";
 import { CustomDropdown } from "./reservationShared";
+import { motion, AnimatePresence } from "motion/react";
 
 const BLOCKS = ["Bloco A", "Bloco B", "Bloco C", "Bloco M"];
 
@@ -33,14 +34,13 @@ function ImportSoftwaresModal({ onClose, onImported }: { onClose: () => void; on
   };
 
   const handlePreview = async () => {
-    if (!file) { showToast("Selecione um arquivo .xlsx.", "error"); return; }
+    if (!file) { showToast("Selecione um ficheiro .xlsx.", "error"); return; }
     setLoading(true);
     try {
       const result = await labsApi.importSoftwaresPreview(file);
       setPreview(result);
       const initialMapping: Record<string, number | null> = {};
       result.labs.forEach(lab => {
-        // Try to auto-match by name
         const match = (systemLabs ?? []).find(
           sl => sl.name.toLowerCase() === lab.lab_name.toLowerCase()
         );
@@ -50,7 +50,7 @@ function ImportSoftwaresModal({ onClose, onImported }: { onClose: () => void; on
       if (result.labs.length > 0) setActiveLabTab(result.labs[0].lab_name);
       setStep(2);
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : "Erro ao processar arquivo.", "error");
+      showToast(e instanceof ApiError ? e.message : "Erro ao processar ficheiro.", "error");
     } finally { setLoading(false); }
   };
 
@@ -73,105 +73,113 @@ function ImportSoftwaresModal({ onClose, onImported }: { onClose: () => void; on
   const activeLabData = preview?.labs.find(l => l.lab_name === activeLabTab);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
       {ToastComponent}
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+        animate={{ opacity: 1, scale: 1, y: 0 }} 
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold text-neutral-900">Importar Softwares via Excel</h2>
             <p className="text-xs font-medium text-neutral-500 mt-1">
-              {step === 1 ? "Passo 1: Selecione o arquivo .xlsx" : `Passo 2: Confirme os ${preview?.total_softwares ?? 0} softwares em ${preview?.labs.length ?? 0} lab(s)`}
+              {step === 1 ? "Passo 1: Selecione o ficheiro .xlsx" : `Passo 2: Confirme os ${preview?.total_softwares ?? 0} softwares em ${preview?.labs.length ?? 0} lab(s)`}
             </p>
           </div>
           <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar space-y-5">
-          {step === 1 && (
-            <>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-neutral-200 rounded-2xl p-10 text-center cursor-pointer hover:border-neutral-400 hover:bg-neutral-50 transition-all"
-              >
-                <FileSpreadsheet size={40} className="mx-auto text-neutral-300 mb-3" />
-                <p className="font-bold text-neutral-700">{file ? file.name : "Clique para selecionar o arquivo"}</p>
-                <p className="text-xs text-neutral-400 mt-1">Formato: .xlsx · Abas por laboratório com coluna de softwares</p>
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-              </div>
-              <div className="bg-neutral-50 border border-neutral-100 rounded-xl p-4 text-xs text-neutral-600 space-y-1">
-                <p className="font-bold text-neutral-700 mb-2">Formato esperado da planilha:</p>
-                <p>- Cada <span className="font-bold">aba</span> da planilha representa um laboratório (nome da aba = nome do lab)</p>
-                <p>- Coluna <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Software</span> ou <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Nome</span> — nome do software</p>
-              </div>
-            </>
-          )}
-
-          {step === 2 && preview && (
-            <>
-              {preview.labs.length === 0 ? (
-                <div className="text-center py-12 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200">
-                  <AppWindow size={36} className="mx-auto text-neutral-300 mb-3" />
-                  <p className="font-bold text-neutral-600">Nenhum software encontrado na planilha.</p>
+          <AnimatePresence mode="wait">
+            {step === 1 && (
+              <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-neutral-200 rounded-2xl p-10 text-center cursor-pointer hover:border-neutral-400 hover:bg-neutral-50 transition-all"
+                >
+                  <FileSpreadsheet size={40} className="mx-auto text-neutral-300 mb-3" />
+                  <p className="font-bold text-neutral-700">{file ? file.name : "Clique para selecionar o ficheiro"}</p>
+                  <p className="text-xs text-neutral-400 mt-1">Formato: .xlsx · Abas por laboratório com coluna de softwares</p>
+                  <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
                 </div>
-              ) : (
-                <>
-                  {/* Lab tabs */}
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {preview.labs.map(lab => (
-                      <button
-                        key={lab.lab_name}
-                        onClick={() => setActiveLabTab(lab.lab_name)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${activeLabTab === lab.lab_name ? "bg-neutral-900 text-white border-neutral-900" : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400"}`}
-                      >
-                        {lab.lab_name} <span className="ml-1 opacity-60">({lab.softwares.length})</span>
-                      </button>
-                    ))}
+                <div className="bg-neutral-50 border border-neutral-100 rounded-xl p-4 text-xs text-neutral-600 space-y-1 mt-4">
+                  <p className="font-bold text-neutral-700 mb-2">Formato esperado da folha de cálculo:</p>
+                  <p>- Cada <span className="font-bold">aba</span> da folha representa um laboratório (nome da aba = nome do lab)</p>
+                  <p>- Coluna <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Software</span> ou <span className="font-mono bg-white border border-neutral-200 px-1 rounded">Nome</span> — nome do software</p>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 2 && preview && (
+              <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                {preview.labs.length === 0 ? (
+                  <div className="text-center py-12 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200">
+                    <AppWindow size={36} className="mx-auto text-neutral-300 mb-3" />
+                    <p className="font-bold text-neutral-600">Nenhum software encontrado na folha de cálculo.</p>
                   </div>
-
-                  {activeLabData && (
-                    <div className="space-y-4">
-                      {/* Lab mapping dropdown */}
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                        <label className="block text-[11px] font-bold text-blue-700 uppercase tracking-widest mb-2">
-                          Mapear "{activeLabData.lab_name}" para laboratório do sistema
-                        </label>
-                        <select
-                          value={labMapping[activeLabData.lab_name] ?? ""}
-                          onChange={e => setLabMapping(m => ({ ...m, [activeLabData.lab_name]: e.target.value ? Number(e.target.value) : null }))}
-                          className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+                ) : (
+                  <>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {preview.labs.map(lab => (
+                        <button
+                          key={lab.lab_name}
+                          onClick={() => setActiveLabTab(lab.lab_name)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${activeLabTab === lab.lab_name ? "bg-neutral-900 text-white border-neutral-900" : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400"}`}
                         >
-                          <option value="">-- Não vincular a nenhum lab --</option>
-                          {(systemLabs ?? []).map(sl => (
-                            <option key={sl.id} value={sl.id}>{sl.name} ({sl.block})</option>
-                          ))}
-                        </select>
-                        {!labMapping[activeLabData.lab_name] && (
-                          <p className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1">
-                            <AlertTriangle size={10} /> Softwares serão criados mas não vinculados a nenhum laboratório.
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Software list */}
-                      <div className="border border-neutral-200 rounded-2xl overflow-hidden">
-                        <div className="bg-neutral-50 border-b border-neutral-100 px-4 py-2.5">
-                          <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest">{activeLabData.softwares.length} software(s) encontrado(s)</p>
-                        </div>
-                        <div className="divide-y divide-neutral-100 max-h-52 overflow-y-auto custom-scrollbar">
-                          {activeLabData.softwares.map((sw, i) => (
-                            <div key={i} className="px-4 py-2.5 flex items-center gap-2">
-                              <AppWindow size={13} className="text-neutral-400 shrink-0" />
-                              <span className="text-sm font-medium text-neutral-800">{sw}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                          {lab.lab_name} <span className="ml-1 opacity-60">({lab.softwares.length})</span>
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
+
+                    {activeLabData && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 mt-4">
+                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                          <label className="block text-[11px] font-bold text-blue-700 uppercase tracking-widest mb-2">
+                            Mapear "{activeLabData.lab_name}" para laboratório do sistema
+                          </label>
+                          <select
+                            value={labMapping[activeLabData.lab_name] ?? ""}
+                            onChange={e => setLabMapping(m => ({ ...m, [activeLabData.lab_name]: e.target.value ? Number(e.target.value) : null }))}
+                            className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm transition-shadow"
+                          >
+                            <option value="">-- Não vincular a nenhum lab --</option>
+                            {(systemLabs ?? []).map(sl => (
+                              <option key={sl.id} value={sl.id}>{sl.name} ({sl.block})</option>
+                            ))}
+                          </select>
+                          {!labMapping[activeLabData.lab_name] && (
+                            <p className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1">
+                              <AlertTriangle size={10} /> Softwares serão criados mas não vinculados a nenhum laboratório.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="border border-neutral-200 rounded-2xl overflow-hidden">
+                          <div className="bg-neutral-50 border-b border-neutral-100 px-4 py-2.5">
+                            <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest">{activeLabData.softwares.length} software(s) encontrado(s)</p>
+                          </div>
+                          <div className="divide-y divide-neutral-100 max-h-52 overflow-y-auto custom-scrollbar">
+                            {activeLabData.softwares.map((sw, i) => (
+                              <div key={i} className="px-4 py-2.5 flex items-center gap-2">
+                                <AppWindow size={13} className="text-neutral-400 shrink-0" />
+                                <span className="text-sm font-medium text-neutral-800">{sw}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="p-6 bg-neutral-50 border-t border-neutral-100 flex gap-3">
@@ -194,8 +202,8 @@ function ImportSoftwaresModal({ onClose, onImported }: { onClose: () => void; on
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -223,6 +231,8 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
     description: initial?.description ?? "",
     software_ids: initial?.softwares?.map(s => s.id) ?? [] as number[],
   });
+  
+  const [swSearch, setSwSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
@@ -235,6 +245,11 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
     setSaving(true);
     try { await onSave(form as any); } finally { setSaving(false); }
   };
+
+  const filteredSoftwares = softwares.filter(sw => 
+    sw.name.toLowerCase().includes(swSearch.toLowerCase()) || 
+    (sw.version && sw.version.toLowerCase().includes(swSearch.toLowerCase()))
+  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -275,8 +290,19 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
           <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">{form.software_ids.length} selecionado(s)</span>
         </label>
         <div className="bg-neutral-50 border border-neutral-100 rounded-2xl p-3">
+          <div className="relative mb-3">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              placeholder="Pesquisar software no catálogo..."
+              value={swSearch}
+              onChange={e => setSwSearch(e.target.value)}
+              className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm transition-shadow"
+            />
+          </div>
+
           <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-            {softwares.map(sw => {
+            {filteredSoftwares.map(sw => {
               const sel = form.software_ids.includes(sw.id);
               return (
                 <button key={sw.id} type="button" onClick={() => toggleSoftware(sw.id)} className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border active:scale-95 ${sel ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-100"}`}>
@@ -284,7 +310,7 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
                 </button>
               );
             })}
-            {softwares.length === 0 && <p className="text-xs text-neutral-400 font-bold p-2">Nenhum software cadastrado no sistema ainda.</p>}
+            {filteredSoftwares.length === 0 && <p className="text-xs text-neutral-400 font-bold p-2">Nenhum software encontrado para a pesquisa.</p>}
           </div>
         </div>
       </div>
@@ -298,13 +324,23 @@ function LabForm({ initial, softwares, onSave, onCancel }: LabFormProps) {
 }
 
 function LabCard({ lab, softwares, canEdit, onEdit, onDelete, activeReservations }: { lab: Laboratory; softwares: Software[]; canEdit: boolean; onEdit: (l: Laboratory) => void; onDelete: (l: Laboratory) => void; activeReservations?: Reservation[]; }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [swSearch, setSwSearch] = useState("");
   const block = lab.block as string;
   const currentReservation = activeReservations?.find(r => r.lab_id === lab.id && r.status === "em_uso");
   const pendingOrApproved = activeReservations?.filter(r => r.lab_id === lab.id && (r.status === "aprovado" || r.status === "pendente"));
 
+  useEffect(() => {
+    if (!showInfoModal) setSwSearch("");
+  }, [showInfoModal]);
+
+  const filteredLabSoftwares = lab.softwares?.filter(sw => 
+    sw.name.toLowerCase().includes(swSearch.toLowerCase()) || 
+    (sw.version && sw.version.toLowerCase().includes(swSearch.toLowerCase()))
+  ) || [];
+
   return (
-    <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden">
+    <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl border border-neutral-200 shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden">
       <div className="p-6">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -334,8 +370,8 @@ function LabCard({ lab, softwares, canEdit, onEdit, onDelete, activeReservations
         )}
 
         <div className="flex items-center justify-between mt-5 pt-4 border-t border-neutral-100">
-          <button onClick={() => setExpanded(v => !v)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors">
-            {expanded ? "Ocultar Sistema" : "Ver Sistema"}
+          <button onClick={() => setShowInfoModal(true)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors">
+            <Info size={14} /> Ver Informações
           </button>
           {canEdit && (
             <div className="flex gap-2">
@@ -345,13 +381,86 @@ function LabCard({ lab, softwares, canEdit, onEdit, onDelete, activeReservations
           )}
         </div>
 
-        {expanded && (
-          <div className="mt-4 pt-4 border-t border-neutral-100 space-y-2 bg-neutral-50/50 p-4 rounded-xl">
-            <p className="text-xs text-neutral-500"><span className="font-bold uppercase tracking-widest text-[9px] mr-2">Catálogo SW</span> {lab.softwares?.length ? lab.softwares.map(s => s.name).join(", ") : "Nenhum software instalado"}</p>
-          </div>
-        )}
+        <AnimatePresence>
+          {showInfoModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" 
+              onClick={(e) => { e.stopPropagation(); setShowInfoModal(false); }}
+            >
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.2 }}
+                className="bg-white rounded-3xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl" 
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                    <Monitor size={20} className="text-blue-500" /> Detalhes do Laboratório
+                  </h3>
+                  <button onClick={() => setShowInfoModal(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+                </div>
+                <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-4 bg-white">
+                  <div className="space-y-3 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
+                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Nome</span><span className="text-sm font-bold text-neutral-900">{lab.name}</span></div>
+                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Bloco / Sala</span><span className="text-sm font-bold text-neutral-900">{lab.block} - {lab.room_number}</span></div>
+                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Capacidade</span><span className="text-sm font-bold text-neutral-900">{lab.capacity} máquinas</span></div>
+                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Tipo</span><span className="text-sm font-bold text-neutral-900">{lab.is_practical ? "Prático" : "Teórico/Padrão"}</span></div>
+                  </div>
+                  
+                  {lab.description && (
+                     <div>
+                       <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Descrição</p>
+                       <p className="text-sm text-neutral-700 leading-relaxed bg-neutral-50 p-3 rounded-xl border border-neutral-100">{lab.description}</p>
+                     </div>
+                  )}
+
+                  <div>
+                     <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-2 flex items-center justify-between">
+                       Catálogo de Softwares
+                       <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">{lab.softwares?.length || 0}</span>
+                     </p>
+                     
+                     {lab.softwares && lab.softwares.length > 0 ? (
+                       <>
+                         <div className="relative mb-3">
+                           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                           <input
+                             type="text"
+                             placeholder="Pesquisar software instalado..."
+                             value={swSearch}
+                             onChange={e => setSwSearch(e.target.value)}
+                             className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300 transition-shadow shadow-sm"
+                           />
+                         </div>
+
+                         {filteredLabSoftwares.length > 0 ? (
+                           <div className="flex flex-wrap gap-2">
+                             {filteredLabSoftwares.map(sw => (
+                               <span key={sw.id} className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white text-neutral-700 border border-neutral-200 shadow-sm flex items-center gap-1.5">
+                                 <AppWindow size={14} className="text-neutral-400" /> {sw.name} {sw.version ? <span className="opacity-50 ml-0.5">v.{sw.version}</span> : ""}
+                               </span>
+                             ))}
+                           </div>
+                         ) : (
+                           <p className="text-sm font-medium text-neutral-400 italic bg-neutral-50 p-3 rounded-xl border border-dashed border-neutral-200 text-center">Nenhum software encontrado.</p>
+                         )}
+                       </>
+                     ) : (
+                       <p className="text-sm font-medium text-neutral-400 italic bg-neutral-50 p-3 rounded-xl border border-dashed border-neutral-200 text-center">Nenhum software vinculado.</p>
+                     )}
+                  </div>
+                </div>
+                <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+                  <button onClick={() => setShowInfoModal(false)} className="px-6 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-sm">
+                    Fechar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -370,6 +479,8 @@ export function LabsPage() {
   const [swForm, setSwForm] = useState({ name: "", version: "" });
   const [savingSw, setSavingSw] = useState(false);
   const [showImportSw, setShowImportSw] = useState(false);
+  
+  const [catalogSearch, setCatalogSearch] = useState("");
 
   const canEdit = user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
@@ -413,32 +524,35 @@ export function LabsPage() {
   };
 
   const filteredLabs = (labs ?? []).filter(l => filterBlock === "all" || l.block === filterBlock);
+  const filteredCatalog = (softwares ?? []).filter(sw => 
+    sw.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
+    (sw.version && sw.version.toLowerCase().includes(catalogSearch.toLowerCase()))
+  );
 
   return (
     <div className="space-y-6 pb-12">
       {ToastComponent}
 
-      {/* Modal de Importação de Softwares */}
-      {showImportSw && (
-        <ImportSoftwaresModal onClose={() => setShowImportSw(false)} onImported={refetchSW} />
-      )}
+      <AnimatePresence>
+        {showImportSw && <ImportSoftwaresModal onClose={() => setShowImportSw(false)} onImported={refetchSW} />}
+      </AnimatePresence>
 
-      {/* Modal de Laboratório */}
-      {(showForm || editTarget) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-100 bg-neutral-50/50">
-              <h3 className="text-xl font-bold text-neutral-900">{editTarget ? "Editar Laboratório" : "Novo Laboratório"}</h3>
-              <button onClick={() => { setShowForm(false); setEditTarget(null); }} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
-            </div>
-            <div className="p-6 overflow-y-auto custom-scrollbar bg-white">
-              <LabForm initial={editTarget ?? undefined} softwares={softwares ?? []} onSave={editTarget ? handleUpdateLab : handleCreateLab} onCancel={() => { setShowForm(false); setEditTarget(null); }} />
-            </div>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {(showForm || editTarget) && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 10 }} transition={{ duration: 0.2 }} className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-100 bg-neutral-50/50">
+                <h3 className="text-xl font-bold text-neutral-900">{editTarget ? "Editar Laboratório" : "Novo Laboratório"}</h3>
+                <button onClick={() => { setShowForm(false); setEditTarget(null); }} className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
+              </div>
+              <div className="p-6 overflow-y-auto custom-scrollbar bg-white">
+                <LabForm initial={editTarget ?? undefined} softwares={softwares ?? []} onSave={editTarget ? handleUpdateLab : handleCreateLab} onCancel={() => { setShowForm(false); setEditTarget(null); }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Header Geral */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 border border-neutral-200 rounded-3xl shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-neutral-900 rounded-xl flex items-center justify-center shadow-inner shrink-0">
@@ -451,7 +565,6 @@ export function LabsPage() {
         </div>
       </header>
 
-      {/* Abas */}
       <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
         <button onClick={() => setActiveTab("labs")} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border whitespace-nowrap active:scale-[0.98] ${activeTab === "labs" ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-white text-neutral-500 border-neutral-200 hover:border-neutral-400 hover:text-neutral-800"}`}>
           Salas e Laboratórios
@@ -461,90 +574,101 @@ export function LabsPage() {
         </button>
       </div>
 
-      {/* Conteúdo: Laboratórios */}
-      {activeTab === "labs" && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <CustomDropdown value={filterBlock} options={[{ value: "all", label: "Todos os Blocos" }, ...BLOCKS.map(b => ({ value: b, label: b }))]} onChange={setFilterBlock} icon={Building2} />
-            {canEdit && (
-              <button onClick={() => { setShowForm(true); setEditTarget(null); }} className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all bg-neutral-900 text-white hover:bg-neutral-800 shadow-md active:scale-95 shrink-0">
-                <Plus size={14} /> Cadastrar Lab
-              </button>
-            )}
-          </div>
-          {loading && <LoadingSpinner label="Sincronizando laboratórios..." />}
-          {error && <ErrorMessage message={error} onRetry={refetch} />}
-          {!loading && !error && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filteredLabs.length === 0 ? (
-                <div className="col-span-full rounded-3xl bg-white border border-dashed border-neutral-200 p-16 text-center"><Monitor size={48} className="mx-auto mb-4 text-neutral-200" /><p className="text-lg font-bold text-neutral-600">Nenhum laboratório mapeado.</p></div>
-              ) : filteredLabs.map(lab => (
-                <LabCard key={lab.id} lab={lab} softwares={softwares ?? []} canEdit={canEdit} onEdit={setEditTarget} onDelete={handleDeleteLab} activeReservations={todayReservations} />
-              ))}
+      <AnimatePresence mode="wait">
+        {activeTab === "labs" && (
+          <motion.div key="labs-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <CustomDropdown value={filterBlock} options={[{ value: "all", label: "Todos os Blocos" }, ...BLOCKS.map(b => ({ value: b, label: b }))]} onChange={setFilterBlock} icon={Building2} />
+              {canEdit && (
+                <button onClick={() => { setShowForm(true); setEditTarget(null); }} className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all bg-neutral-900 text-white hover:bg-neutral-800 shadow-md active:scale-95 shrink-0">
+                  <Plus size={14} /> Cadastrar Lab
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Conteúdo: Softwares */}
-      {activeTab === "softwares" && (
-        <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Form */}
-            {canEdit && (
-              <div className="w-full lg:w-1/3 space-y-4 lg:border-r border-neutral-100 lg:pr-8">
-                <div>
-                  <h3 className="font-black text-lg text-neutral-900">Novo Software</h3>
-                  <p className="text-xs font-medium text-neutral-500 mt-1 leading-relaxed">Adicione programas ao catálogo para que eles fiquem disponíveis para vínculo nos laboratórios.</p>
-                </div>
-                <form onSubmit={handleCreateSoftware} className="space-y-4">
-                  <div>
-                    <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Nome do Software *</label>
-                    <input required value={swForm.name} onChange={e => setSwForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: AutoCAD" className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none transition-shadow shadow-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Versão / Ano (Opcional)</label>
-                    <input value={swForm.version} onChange={e => setSwForm(f => ({ ...f, version: e.target.value }))} placeholder="Ex: 2024.1" className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none transition-shadow shadow-sm" />
-                  </div>
-                  <button type="submit" disabled={savingSw} className="w-full py-3 bg-neutral-900 text-white rounded-xl font-bold text-sm hover:bg-neutral-800 transition-all shadow-md active:scale-[0.98] disabled:opacity-50">
-                    {savingSw ? <LoadingSpinner label="" /> : "Registrar no Catálogo"}
-                  </button>
-                </form>
-              </div>
-            )}
-            {/* Lista */}
-            <div className={`w-full ${canEdit ? "lg:w-2/3" : ""}`}>
-              <h3 className="font-black text-lg text-neutral-900 mb-5 flex items-center justify-between flex-wrap gap-2">
-                <span className="flex items-center gap-3">
-                  Softwares Homologados na Instituição
-                  <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-1 rounded-md border border-neutral-200">{softwares?.length || 0} registrados</span>
-                </span>
-                {canEdit && (
-                  <button onClick={() => setShowImportSw(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neutral-200 text-xs font-bold text-neutral-600 hover:bg-neutral-100 transition-colors bg-white shadow-sm">
-                    <FileSpreadsheet size={14} /> Importar Softwares
-                  </button>
-                )}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
-                {softwares?.map(sw => (
-                  <div key={sw.id} className="bg-neutral-50 border border-neutral-200 p-4 rounded-2xl flex flex-col justify-between group hover:border-neutral-300 hover:shadow-md transition-all">
-                    <div>
-                      <p className="font-bold text-sm text-neutral-900 leading-tight">{sw.name}</p>
-                      {sw.version && <p className="text-[10px] font-bold text-neutral-500 mt-1 bg-white border border-neutral-200 px-1.5 py-0.5 rounded w-fit">v.{sw.version}</p>}
-                    </div>
-                    {canEdit && (
-                      <button onClick={() => handleDeleteSoftware(sw)} className="mt-4 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 w-fit opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                        <Trash2 size={12} /> Remover
-                      </button>
-                    )}
-                  </div>
+            {loading && <LoadingSpinner label="Sincronizando laboratórios..." />}
+            {error && <ErrorMessage message={error} onRetry={refetch} />}
+            {!loading && !error && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {filteredLabs.length === 0 ? (
+                  <div className="col-span-full rounded-3xl bg-white border border-dashed border-neutral-200 p-16 text-center"><Monitor size={48} className="mx-auto mb-4 text-neutral-200" /><p className="text-lg font-bold text-neutral-600">Nenhum laboratório mapeado.</p></div>
+                ) : filteredLabs.map(lab => (
+                  <LabCard key={lab.id} lab={lab} softwares={softwares ?? []} canEdit={canEdit} onEdit={setEditTarget} onDelete={handleDeleteLab} activeReservations={todayReservations} />
                 ))}
-                {softwares?.length === 0 && <p className="col-span-full text-center text-sm font-bold text-neutral-400 py-10">O catálogo está vazio.</p>}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === "softwares" && (
+          <motion.div key="softwares-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6">
+            <div className="flex flex-col lg:flex-row gap-8">
+              {canEdit && (
+                <div className="w-full lg:w-1/3 space-y-4 lg:border-r border-neutral-100 lg:pr-8">
+                  <div>
+                    <h3 className="font-black text-lg text-neutral-900">Novo Software</h3>
+                    <p className="text-xs font-medium text-neutral-500 mt-1 leading-relaxed">Adicione programas ao catálogo para que eles fiquem disponíveis para vínculo nos laboratórios.</p>
+                  </div>
+                  <form onSubmit={handleCreateSoftware} className="space-y-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Nome do Software *</label>
+                      <input required value={swForm.name} onChange={e => setSwForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: AutoCAD" className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none transition-shadow shadow-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Versão / Ano (Opcional)</label>
+                      <input value={swForm.version} onChange={e => setSwForm(f => ({ ...f, version: e.target.value }))} placeholder="Ex: 2024.1" className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none transition-shadow shadow-sm" />
+                    </div>
+                    <button type="submit" disabled={savingSw} className="w-full py-3 bg-neutral-900 text-white rounded-xl font-bold text-sm hover:bg-neutral-800 transition-all shadow-md active:scale-[0.98] disabled:opacity-50">
+                      {savingSw ? <LoadingSpinner label="" /> : "Registrar no Catálogo"}
+                    </button>
+                  </form>
+                </div>
+              )}
+              
+              <div className={`w-full ${canEdit ? "lg:w-2/3" : ""}`}>
+                <h3 className="font-black text-lg text-neutral-900 mb-4 flex items-center justify-between flex-wrap gap-2">
+                  <span className="flex items-center gap-3">
+                    Softwares Homologados na Instituição
+                    <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-1 rounded-md border border-neutral-200">{softwares?.length || 0} registados</span>
+                  </span>
+                  {canEdit && (
+                    <button onClick={() => setShowImportSw(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neutral-200 text-xs font-bold text-neutral-600 hover:bg-neutral-100 transition-colors bg-white shadow-sm">
+                      <FileSpreadsheet size={14} /> Importar Softwares
+                    </button>
+                  )}
+                </h3>
+                
+                <div className="relative mb-4">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar no catálogo geral..."
+                    value={catalogSearch}
+                    onChange={e => setCatalogSearch(e.target.value)}
+                    className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm transition-shadow"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                  {filteredCatalog?.map(sw => (
+                    <motion.div layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} key={sw.id} className="bg-neutral-50 border border-neutral-200 p-4 rounded-2xl flex flex-col justify-between group hover:border-neutral-300 hover:shadow-md transition-all">
+                      <div>
+                        <p className="font-bold text-sm text-neutral-900 leading-tight">{sw.name}</p>
+                        {sw.version && <p className="text-[10px] font-bold text-neutral-500 mt-1 bg-white border border-neutral-200 px-1.5 py-0.5 rounded w-fit">v.{sw.version}</p>}
+                      </div>
+                      {canEdit && (
+                        <button onClick={() => handleDeleteSoftware(sw)} className="mt-4 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 w-fit opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                          <Trash2 size={12} /> Remover
+                        </button>
+                      )}
+                    </motion.div>
+                  ))}
+                  {filteredCatalog?.length === 0 && <p className="col-span-full text-center text-sm font-bold text-neutral-400 py-10">Nenhum software atende à sua pesquisa.</p>}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

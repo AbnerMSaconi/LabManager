@@ -7,16 +7,13 @@ import {
   Info, XCircle, Edit, Trash2, X, Package, Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { ReservationStatus, Reservation, Laboratory, ReservationItem } from "../types";
+import { ReservationStatus, Reservation, Laboratory, ReservationItem, UserRole } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
 import { labsApi } from "../api/labsApi";
 import { LoadingSpinner, useToast } from "../components/ui";
 import { ApiError } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import { UserRole } from "../types";
-
-// ... [Ocultei as CONSTANTES, TIME_SLOTS, e BADGES para economizar texto aqui, MANTENHA AS MESMAS DO CÓDIGO ORIGINAL!] ...
 
 export const STATUS_STYLES: Record<string, string> = {
   [ReservationStatus.APROVADO]:            "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -43,64 +40,90 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
+
 export function SoftwareBadge({ softwares, label = "Software" }: { softwares?: string | null; label?: string }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   
-  useEffect(() => { 
-    if (!open) return; 
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; 
-    document.addEventListener("mousedown", h); 
-    return () => document.removeEventListener("mousedown", h); 
-  }, [open]);
-
-  // 👇 Trava de Segurança Adicionada Aqui 👇
   if (!softwares) return null;
   const list = String(softwares).split(",").map(s => s.trim()).filter(Boolean);
   if (list.length === 0) return null;
-  // 👆 Fim da Trava de Segurança 👆
 
   return (
-    <div className="relative inline-block" ref={ref}>
-      <button onClick={e => { e.stopPropagation(); setOpen(v => !v); }} className="flex items-center gap-0.5 text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer">
+    <>
+      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }} className="flex items-center gap-0.5 text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer">
         {label} <ChevronDown size={9} />
       </button>
+      
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden min-w-[160px]">
-          <div className="bg-purple-50 border-b border-purple-100 px-3 py-2 text-[10px] font-bold text-purple-700 uppercase tracking-widest">
-            Softwares ({list.length})
-          </div>
-          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
-            {list.map((sw, i) => (
-              <div key={i} className="px-3 py-2 text-xs font-medium text-neutral-700 flex items-center gap-2 hover:bg-neutral-50">
-                <Monitor size={11} className="text-purple-400 flex-shrink-0" />{sw}
-              </div>
-            ))}
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                <Monitor size={20} className="text-purple-500" /> Softwares Solicitados
+              </h3>
+              <button onClick={() => setOpen(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-2 bg-white">
+              {list.map((sw, i) => (
+                <div key={i} className="px-4 py-3 text-sm font-medium text-neutral-700 flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                  <div className="p-2 bg-white rounded-lg shadow-sm border border-neutral-100"><Monitor size={16} className="text-purple-500" /></div>
+                  {sw}
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+              <button onClick={() => setOpen(false)} className="px-6 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-sm">
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 export function MaterialsBadge({ items }: { items: ReservationItem[] }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (!open) return; const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, [open]);
+  if (!items || items.length === 0) return null;
+
   return (
-    <div className="relative inline-block" ref={ref}>
-      <button onClick={e => { e.stopPropagation(); setOpen(v => !v); }} className="flex items-center gap-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer">Materiais <ChevronDown size={9} /></button>
+    <>
+      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }} className="flex items-center gap-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer">
+        Materiais <ChevronDown size={9} />
+      </button>
+      
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden min-w-[180px]">
-          <div className="bg-amber-50 border-b border-amber-100 px-3 py-2 text-[10px] font-bold text-amber-700 uppercase tracking-widest">Materiais ({items.length})</div>
-          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">{items.map(item => (<div key={item.id} className="px-3 py-2 text-xs font-medium text-neutral-700 flex items-center justify-between gap-3 hover:bg-neutral-50"><span className="flex items-center gap-2"><Package size={11} className="text-amber-400 flex-shrink-0" />{item.model?.name ?? `Item #${item.item_model_id}`}</span><span className="text-neutral-400 font-bold">x{item.quantity_requested}</span></div>))}</div>
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                <Package size={20} className="text-amber-500" /> Materiais Solicitados
+              </h3>
+              <button onClick={() => setOpen(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-2 bg-white">
+              {items.map(item => (
+                <div key={item.id} className="px-4 py-3 text-sm font-medium text-neutral-700 flex items-center justify-between gap-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                  <span className="flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-lg shadow-sm border border-neutral-100"><Package size={16} className="text-amber-500" /></div>
+                    {item.model?.name ?? `Item #${item.item_model_id}`}
+                  </span>
+                  <span className="text-neutral-900 font-black bg-white px-2 py-1 rounded-lg shadow-sm border border-neutral-100">x{item.quantity_requested}</span>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+              <button onClick={() => setOpen(false)} className="px-6 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-sm">
+                Fechar
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
-
-// ─── Dropdown Customizado (Injetado) ──────────────────────────────────────────
 
 export function CustomDropdown({ value, options, onChange, icon: Icon, prefix = "", placeholder = "Selecione" }: { value: string | number; options: { value: string | number; label: string }[]; onChange: (val: any) => void; icon: React.ElementType; prefix?: string; placeholder?: string; }) {
   const [open, setOpen] = useState(false);
@@ -140,8 +163,6 @@ export function CustomDropdown({ value, options, onChange, icon: Icon, prefix = 
     </div>
   );
 }
-
-// ─── Modal de Edição (Estilizado) ─────────────────────────────────────────────
 
 function EditReservationModal({ reservation, onClose, onSaved }: { reservation: Reservation, onClose: () => void, onSaved: () => void }) {
   const { showToast, ToastComponent } = useToast();
@@ -240,14 +261,11 @@ function EditReservationModal({ reservation, onClose, onSaved }: { reservation: 
   );
 }
 
-// ─── TimetableWizard ─────────────────────────────────────────────────────────
-
 export function TimetableWizard({ onClose }: { onClose: () => void }) {
   const { showToast, ToastComponent } = useToast();
   const { data: labs, loading: labsLoading } = useFetch(labsApi.list);
   const { data: allReservations, loading: resLoading, refetch: refetchRes } = useFetch(reservationsApi.listAll, [], true);
   
-  // 👇 PUXANDO O USUÁRIO LOGADO E DEFININDO A PERMISSÃO
   const { user } = useAuth();
   const canManageReservation = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
 
@@ -487,7 +505,6 @@ export function TimetableWizard({ onClose }: { onClose: () => void }) {
               </div>
             </div>
             
-            {/* 👇 BOTÕES COM TRAVA DE PERMISSÃO 👇 */}
             <div className="p-6 bg-neutral-50 border-t border-neutral-100 flex gap-3">
               <button 
                 onClick={() => { setEditingReservation(selectedReservation); setSelectedReservation(null); }}
@@ -507,8 +524,6 @@ export function TimetableWizard({ onClose }: { onClose: () => void }) {
                 <Trash2 size={16} /> Excluir
               </button>
             </div>
-            {/* 👆 BOTÕES COM TRAVA DE PERMISSÃO 👆 */}
-            
           </div>
         </div>
       )}

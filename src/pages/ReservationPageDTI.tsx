@@ -8,6 +8,7 @@ import {
   Eye, AlertTriangle, CheckCheck, X, Info, Monitor, MoreHorizontal,
   SortAsc, SortDesc, Building2, Check, Download
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { UserRole, ReservationStatus, Reservation, Software } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { useFetch } from "../hooks/useFetch";
@@ -16,7 +17,7 @@ import { maintenanceApi } from "../api/maintenanceApi";
 import { labsApi } from "../api/labsApi";
 import { LoadingSpinner, ErrorMessage, useToast } from "../components/ui";
 import { StatusBadge, WEEKDAY_NAMES, TimetableWizard, SoftwareBadge, MaterialsBadge } from "./reservationShared";
-import { ApiError } from "../api/client";
+import { api, ApiError } from "../api/client";
 
 const ITEMS_PER_PAGE = 8;
 
@@ -99,184 +100,249 @@ function CustomDropdown({
   );
 }
 
-// ─── Modal genérico de texto ──────────────────────────────────────────────────
-function TextModal({
-  title, subtitle, placeholder, confirmLabel, confirmClass, icon, onConfirm, onClose, loading, required = true,
-}: {
-  title: string; subtitle: string; placeholder: string; confirmLabel: string; confirmClass: string;
-  icon: React.ReactNode; onConfirm: (text: string) => void; onClose: () => void; loading: boolean; required?: boolean;
+// ─── Componentes de Modal Compartilhados ──────────────────────────────────────
+const ModalOverlay = ({ children, onClose }: { children: React.ReactNode; onClose: () => void }) => (
+  <motion.div
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.2 }}
+      className="bg-white rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-black/5 p-6 flex flex-col max-h-[90vh]"
+      onClick={e => e.stopPropagation()}
+    >
+      {children}
+    </motion.div>
+  </motion.div>
+);
+
+function TextModal({ title, subtitle, placeholder, confirmLabel, confirmClass, icon, onConfirm, onClose, loading, required = true }: {
+  title: string; subtitle: string; placeholder: string; confirmLabel: string; confirmClass: string; icon: React.ReactNode; onConfirm: (text: string) => void; onClose: () => void; loading: boolean; required?: boolean;
 }) {
   const [text, setText] = useState("");
   const canSubmit = required ? text.trim().length > 0 : true;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-black/5 p-6 space-y-4">
-        <div className="flex justify-between items-start">
-          <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">{icon}{title}</h3>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 mt-0.5"><X size={20} /></button>
-        </div>
-        <p className="text-sm text-neutral-600">{subtitle}</p>
-        <textarea
-          value={text} onChange={e => setText(e.target.value)} rows={4} placeholder={placeholder}
-          className="w-full border border-neutral-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300"
-        />
-        <div className="flex gap-3 pt-1">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
-          <button onClick={() => canSubmit && onConfirm(text.trim())} disabled={!canSubmit || loading} className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${confirmClass}`}>
-            {loading ? "Aguarde…" : confirmLabel}
-          </button>
-        </div>
+    <ModalOverlay onClose={onClose}>
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">{icon}{title}</h3>
+        <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 mt-0.5"><X size={20} /></button>
       </div>
-    </div>
+      <p className="text-sm text-neutral-600 mb-4">{subtitle}</p>
+      <textarea
+        value={text} onChange={e => setText(e.target.value)} rows={4} placeholder={placeholder}
+        className="w-full border border-neutral-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-neutral-300 mb-4"
+      />
+      <div className="flex gap-3 mt-auto">
+        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50 transition-colors">Cancelar</button>
+        <button onClick={() => canSubmit && onConfirm(text.trim())} disabled={!canSubmit || loading} className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 transition-all ${confirmClass}`}>
+          {loading ? "Aguarde…" : confirmLabel}
+        </button>
+      </div>
+    </ModalOverlay>
   );
 }
 
-// ─── Modal de agendamento de software ────────────────────────────────────────
-function SwModal({
-  labName, professor, softwares, onConfirm, onClose, loading,
-}: {
+function SwModal({ labName, professor, softwares, onConfirm, onClose, loading }: {
   labName?: string; professor?: string; softwares?: string; onConfirm: () => void; onClose: () => void; loading: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-black/5 p-6 space-y-4">
-        <div className="flex justify-between items-start">
-          <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Monitor size={20} className="text-purple-500" /> Agendar Instalação de Software</h3>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 mt-0.5"><X size={20} /></button>
-        </div>
-        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-2 text-sm">
-          <p><span className="font-bold text-purple-700">Laboratório:</span> {labName ?? "—"}</p>
-          <p><span className="font-bold text-purple-700">Professor:</span> {professor ?? "—"}</p>
-          <p><span className="font-bold text-purple-700">Softwares:</span> {softwares ?? "—"}</p>
-        </div>
-        <p className="text-sm text-neutral-600">Um ticket de manutenção será criado e a reserva passará para <strong>Aguardando Software</strong> até a confirmação da instalação.</p>
-        <div className="flex gap-3 pt-1">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
-          <button onClick={onConfirm} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-700 disabled:opacity-50">
-            {loading ? "Criando ticket…" : "Confirmar e Criar Ticket"}
-          </button>
-        </div>
+    <ModalOverlay onClose={onClose}>
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Monitor size={20} className="text-purple-500" /> Agendar Instalação</h3>
+        <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 mt-0.5"><X size={20} /></button>
       </div>
-    </div>
+      <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-2 text-sm mb-4">
+        <p><span className="font-bold text-purple-700">Laboratório:</span> {labName ?? "—"}</p>
+        <p><span className="font-bold text-purple-700">Professor:</span> {professor ?? "—"}</p>
+        <p><span className="font-bold text-purple-700">Softwares:</span> {softwares ?? "—"}</p>
+      </div>
+      <p className="text-sm text-neutral-600 mb-6">Um ticket de manutenção será criado e a reserva passará para <strong>Aguardando Software</strong> até a confirmação da instalação.</p>
+      <div className="flex gap-3 mt-auto">
+        <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50 transition-colors">Cancelar</button>
+        <button onClick={onConfirm} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-700 disabled:opacity-50 transition-all">
+          {loading ? "Criando ticket…" : "Confirmar Ticket"}
+        </button>
+      </div>
+    </ModalOverlay>
   );
 }
 
-// ─── Modal de Confirmação de Instalação (Catálogo) ───────────────────────────
 function ConfirmInstallModal({ 
-  target, softwares, onClose, onConfirm 
+  target, softwares, onClose, onConfirm, onSoftwareAdded
 }: { 
   target: { id: number | string, requested: string, isGroup: boolean, labName: string }; 
-  softwares: Software[]; onClose: () => void; onConfirm: (ids: number[]) => Promise<void> 
+  softwares: Software[]; onClose: () => void; onConfirm: (ids: number[]) => Promise<void>; onSoftwareAdded: () => void;
 }) {
+  const { showToast, ToastComponent } = useToast();
   const [selected, setSelected] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+  const [swSearch, setSwSearch] = useState("");
+  
+  const [swForm, setSwForm] = useState({ name: "", version: "" });
+  const [savingSw, setSavingSw] = useState(false);
+
   const toggle = (id: number) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
+  const filteredSoftwares = softwares.filter(sw => 
+    sw.name.toLowerCase().includes(swSearch.toLowerCase()) || 
+    (sw.version && sw.version.toLowerCase().includes(swSearch.toLowerCase()))
+  );
+
+  const handleCreateSoftware = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!swForm.name.trim()) return;
+    setSavingSw(true);
+    try {
+      await api.post("/softwares", { name: swForm.name.trim(), version: swForm.version.trim() || undefined });
+      showToast("Software cadastrado no catálogo.", "success");
+      setSwForm({ name: "", version: "" });
+      onSoftwareAdded();
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : "Erro ao cadastrar software.", "error");
+    } finally {
+      setSavingSw(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg flex flex-col overflow-hidden shadow-2xl">
-        <div className="px-6 py-5 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {ToastComponent}
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.2 }} className="bg-white rounded-3xl w-full max-w-4xl flex flex-col overflow-hidden shadow-2xl max-h-[90vh]">
+        
+        <div className="px-6 py-5 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-xl font-bold text-blue-900">Confirmar Instalação</h3>
             <p className="text-xs font-bold text-blue-700 mt-0.5 tracking-wide uppercase">{target.labName}</p>
           </div>
           <button onClick={onClose} className="p-2 bg-blue-100/50 text-blue-500 hover:bg-blue-200 rounded-full transition-colors"><X size={20}/></button>
         </div>
-        <div className="p-6 space-y-5 bg-white">
-          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">O professor solicitou:</p>
-            <p className="text-sm font-bold text-amber-900">{target.requested || "Nenhum software específico detalhado."}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-3">O que foi instalado e homologado no laboratório?</p>
-            <div className="max-h-56 overflow-y-auto custom-scrollbar grid grid-cols-2 gap-2 pr-1">
-              {softwares.map(sw => {
-                const sel = selected.includes(sw.id);
-                return (
-                  <button key={sw.id} onClick={() => toggle(sw.id)} className={`px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-start gap-2 ${sel ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-neutral-50 text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:bg-white"}`}>
-                    <div className="mt-0.5 shrink-0">{sel ? <Check size={14} className="text-white"/> : <Monitor size={14} className="text-neutral-400"/>}</div>
-                    <span className="leading-tight">{sw.name} {sw.version ? <span className="block text-[9px] font-medium opacity-70 mt-0.5">v.{sw.version}</span> : ""}</span>
-                  </button>
-                )
-              })}
+        
+        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8 bg-white overflow-y-auto custom-scrollbar">
+          
+          <div className="space-y-5">
+            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">O professor solicitou:</p>
+              <p className="text-sm font-bold text-amber-900">{target.requested || "Nenhum software específico detalhado."}</p>
             </div>
-            {softwares.length === 0 && <p className="text-xs font-bold text-neutral-400 text-center">Nenhum software cadastrado no catálogo do sistema.</p>}
+            
+            <div>
+              <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-3 flex items-center justify-between">
+                Selecione o que foi instalado:
+                <span className="bg-neutral-100 px-2 py-0.5 rounded text-neutral-600">{selected.length} selecionado(s)</span>
+              </p>
+              
+              <div className="relative mb-3">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar no catálogo..."
+                  value={swSearch}
+                  onChange={e => setSwSearch(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 shadow-sm transition-shadow"
+                />
+              </div>
+
+              <div className="max-h-[32vh] overflow-y-auto custom-scrollbar grid grid-cols-1 sm:grid-cols-2 gap-2 pr-1">
+                {filteredSoftwares.map(sw => {
+                  const sel = selected.includes(sw.id);
+                  return (
+                    <button key={sw.id} onClick={() => toggle(sw.id)} className={`px-3 py-2.5 rounded-xl text-left text-xs font-bold border transition-all flex items-start gap-2 ${sel ? "bg-neutral-900 text-white border-neutral-900 shadow-md" : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400"}`}>
+                      <div className="mt-0.5 shrink-0">{sel ? <Check size={14} className="text-white"/> : <Monitor size={14} className="text-neutral-400"/>}</div>
+                      <span className="leading-tight">{sw.name} {sw.version ? <span className="block text-[9px] font-medium opacity-70 mt-0.5">v.{sw.version}</span> : ""}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {filteredSoftwares.length === 0 && <p className="text-xs font-bold text-neutral-400 text-center py-4">Nenhum software atende à busca.</p>}
+            </div>
           </div>
+
+          <div className="space-y-4 lg:border-l border-neutral-100 lg:pl-8">
+             <div>
+               <h3 className="font-black text-lg text-neutral-900">Novo Software</h3>
+               <p className="text-xs font-medium text-neutral-500 mt-1 leading-relaxed">Adicione programas ao catálogo caso não os encontre na lista ao lado.</p>
+             </div>
+             
+             <form onSubmit={handleCreateSoftware} className="space-y-4">
+               <div>
+                 <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Nome do Software *</label>
+                 <input required value={swForm.name} onChange={e => setSwForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: AutoCAD" className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none transition-shadow shadow-sm" />
+               </div>
+               <div>
+                 <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">Versão / Ano (Opcional)</label>
+                 <input value={swForm.version} onChange={e => setSwForm(f => ({ ...f, version: e.target.value }))} placeholder="Ex: 2024.1" className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-neutral-900 outline-none transition-shadow shadow-sm" />
+               </div>
+               <button type="submit" disabled={savingSw} className="w-full py-3 bg-neutral-900 text-white rounded-xl font-bold text-sm hover:bg-neutral-800 transition-all shadow-md active:scale-[0.98] disabled:opacity-50">
+                 {savingSw ? <LoadingSpinner label="" /> : "Registrar no Catálogo"}
+               </button>
+             </form>
+          </div>
+
         </div>
-        <div className="p-6 border-t border-neutral-100 flex gap-3 bg-neutral-50">
+
+        <div className="p-6 border-t border-neutral-100 flex gap-3 bg-neutral-50 shrink-0">
           <button onClick={onClose} className="flex-1 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-600 hover:bg-neutral-100 transition-all shadow-sm">Cancelar</button>
           <button onClick={async () => { setSaving(true); await onConfirm(selected); setSaving(false); }} disabled={saving} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-95">
             {saving ? "Aguarde..." : "Concluir e Aprovar Aula"}
           </button>
         </div>
-      </div>
-    </div>
+
+      </motion.div>
+    </motion.div>
   )
 }
 
-// ─── Popover de ações (Apenas para aprovação/rejeição) ───────────────────────
-const ACTION_COLORS: Record<string, string> = {
-  emerald: "text-emerald-700 hover:bg-emerald-50", amber: "text-amber-700 hover:bg-amber-50",
-  purple: "text-purple-700 hover:bg-purple-50", red: "text-red-600 hover:bg-red-50", blue: "text-blue-700 hover:bg-blue-50",
-};
-
-type ActionItem = { label: string; Icon: React.ElementType; color: string; onClick: () => void; };
-
+// ─── Botões de Ações Rápidas (Inline) ───────────────────────────────────
 function ActionPopover({
   status, hasSW, onApprove, onCaveats, onScheduleSW, onReject,
 }: {
   status: ReservationStatus; hasSW: boolean;
   onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onReject: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const actions: ActionItem[] = [];
-
   if (status === ReservationStatus.PENDENTE) {
-    actions.push({ label: "Aprovar", Icon: CheckCircle2, color: "emerald", onClick: onApprove });
-    actions.push({ label: "Aprovar com Ressalvas", Icon: AlertTriangle, color: "amber", onClick: onCaveats });
-    if (hasSW) actions.push({ label: "Agendar Software", Icon: Monitor, color: "purple", onClick: onScheduleSW });
-    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
-  } else if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
-    actions.push({ label: "Confirmar Aprovação", Icon: CheckCheck, color: "emerald", onClick: onApprove });
-    actions.push({ label: "Rejeitar", Icon: XCircle, color: "red", onClick: onReject });
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <button onClick={onApprove} title="Aprovar" className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 shadow-sm active:scale-95">
+          <CheckCircle2 size={16} strokeWidth={2.5} />
+        </button>
+        <button onClick={onCaveats} title="Aprovar com Ressalvas" className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all border border-amber-200 shadow-sm active:scale-95">
+          <AlertTriangle size={16} strokeWidth={2.5} />
+        </button>
+        {hasSW && (
+          <button onClick={onScheduleSW} title="Agendar Instalação de Software" className="p-2.5 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all border border-purple-200 shadow-sm active:scale-95">
+            <Monitor size={16} strokeWidth={2.5} />
+          </button>
+        )}
+        <button onClick={onReject} title="Rejeitar" className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all border border-red-200 shadow-sm active:scale-95">
+          <XCircle size={16} strokeWidth={2.5} />
+        </button>
+      </div>
+    );
+  }
+  
+  if (status === ReservationStatus.APROVADO_COM_RESSALVAS) {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <button onClick={onApprove} title="Confirmar Aprovação Definitiva" className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 shadow-sm active:scale-95">
+          <CheckCheck size={16} strokeWidth={2.5} />
+        </button>
+        <button onClick={onReject} title="Rejeitar" className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all border border-red-200 shadow-sm active:scale-95">
+          <XCircle size={16} strokeWidth={2.5} />
+        </button>
+      </div>
+    );
   }
 
-  if (actions.length === 0) return null;
-
-  return (
-    <div className="relative inline-block" ref={ref}>
-      <button onClick={() => setOpen(v => !v)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${open ? "bg-neutral-900 text-white border-neutral-900" : "bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200"}`}>
-        <MoreHorizontal size={14} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-40 bg-white border border-neutral-200 rounded-xl shadow-xl overflow-hidden w-52">
-          <div className="py-1">
-            {actions.map(({ label, Icon, color, onClick }) => (
-              <button key={label} onClick={() => { onClick(); setOpen(false); }} className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors ${ACTION_COLORS[color]}`}>
-                <Icon size={15} /> {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return null;
 }
 
-// ─── Linha avulsa ─────────────────────────────────────────────────────────────
+// ─── Linhas da Tabela ────────────────────────────────────────────────────────
 function SingleRow({
-  r, canApprove, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
+  r, canApprove, canInstallSW, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
 }: {
-  r: Reservation; canApprove: boolean;
+  r: Reservation; canApprove: boolean; canInstallSW: boolean;
   onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
 }) {
   return (
@@ -296,16 +362,15 @@ function SingleRow({
       <td className="px-4 py-4">
         <p className="text-sm font-bold text-neutral-700">{r.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1 mt-1 flex-wrap">
-          {r.items && r.items.length > 0 && <MaterialsBadge items={r.items} />}
-          {r.requested_softwares && <SoftwareBadge softwares={r.requested_softwares} label={r.software_installation_required ? "Instalar SW" : "SW Solicitado"} />}
+          <MaterialsBadge items={r.items || []} />
+          <SoftwareBadge softwares={r.requested_softwares} label={r.software_installation_required ? "Instalar SW" : "SW Solicitado"} />
         </div>
         {r.approval_notes && <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={r.approval_notes}><Info size={10} /> {r.approval_notes.length > 50 ? r.approval_notes.slice(0, 50) + "…" : r.approval_notes}</p>}
       </td>
       <td className="px-4 py-4"><StatusBadge status={r.status} /></td>
       
       <td className="px-4 py-4 text-right align-middle">
-        {/* Aqui garantimos que o botão azul aparece 100% das vezes que for AGUARDANDO SOFTWARE nesta tela */}
-        {r.status === ReservationStatus.AGUARDANDO_SOFTWARE ? (
+        {r.status === ReservationStatus.AGUARDANDO_SOFTWARE && canInstallSW ? (
           <button onClick={onConfirmSW} className="inline-flex whitespace-nowrap items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-md active:scale-95 ml-auto">
             <Download size={14} /> Concluir Instalação
           </button>
@@ -319,14 +384,13 @@ function SingleRow({
   );
 }
 
-// ─── Linha de lote ─────────────────────────────────────────────────────────────
 function GroupRow({
-  group, canApprove, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
+  group, canApprove, canInstallSW, onApprove, onCaveats, onScheduleSW, onConfirmSW, onReject,
 }: {
-  group: Reservation[]; canApprove: boolean;
+  group: Reservation[]; canApprove: boolean; canInstallSW: boolean;
   onApprove: () => void; onCaveats: () => void; onScheduleSW: () => void; onConfirmSW: () => void; onReject: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openDates, setOpenDates] = useState(false);
   const first = group[0];
   const { type, weekday } = groupLabel(group);
   const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date));
@@ -350,39 +414,50 @@ function GroupRow({
             <p className="text-xs text-neutral-400 mt-0.5">{new Date(sorted[0].date + "T12:00:00").toLocaleDateString("pt-BR")} → {new Date(sorted[sorted.length - 1].date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
           </div>
         ) : (
-          <div className="relative">
-            <button onClick={() => setOpen(v => !v)} className="flex items-center gap-1.5 text-sm font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg transition-colors">
-              <CalendarDays size={13} /> {group.length} datas {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          <>
+            <button onClick={() => setOpenDates(true)} className="flex items-center gap-1.5 text-sm font-bold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg transition-colors">
+              <CalendarDays size={13} /> {group.length} datas <ChevronDown size={13} />
             </button>
-            {open && (
-              <div className="absolute top-full left-0 z-30 mt-1 bg-white border border-neutral-200 rounded-xl shadow-xl w-64">
-                <div className="bg-neutral-50 border-b border-neutral-100 px-3 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Todas as datas ({group.length})</div>
-                <div className="max-h-52 overflow-y-auto p-1 custom-scrollbar">
-                  {sorted.map(r => (
-                    <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-neutral-50 text-xs font-medium text-neutral-700">
-                      <span>{new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}</span>
-                      <StatusBadge status={r.status} />
+            <AnimatePresence>
+              {openDates && (
+                <ModalOverlay onClose={() => setOpenDates(false)}>
+                  <div className="-mx-6 -mt-6 px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center mb-4 rounded-t-2xl">
+                    <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><CalendarDays size={20} className="text-sky-500" /> Datas Solicitadas</h3>
+                    <button onClick={() => setOpenDates(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+                  </div>
+                  <div className="overflow-y-auto max-h-[50vh] custom-scrollbar space-y-2 flex-1 pr-1">
+                    <div className="bg-sky-50 p-4 rounded-2xl border border-sky-100 mb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700 mb-1">Resumo do Lote</p>
+                      <p className="text-sm font-bold text-sky-900">{group.length} aulas · Laboratório {first.laboratory?.name}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+                    {sorted.map(r => (
+                      <div key={r.id} className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-neutral-100 bg-neutral-50 hover:bg-neutral-100 transition-colors text-sm font-medium text-neutral-700">
+                        <span className="flex items-center gap-2"><CalendarDays size={14} className="text-neutral-400" />{new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}</span>
+                        <StatusBadge status={r.status} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-4 border-t border-neutral-100 mt-4 flex justify-end">
+                    <button onClick={() => setOpenDates(false)} className="px-6 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-sm">Fechar</button>
+                  </div>
+                </ModalOverlay>
+              )}
+            </AnimatePresence>
+          </>
         )}
       </td>
       <td className="px-4 py-4">
         <p className="text-sm font-bold text-neutral-700">{first.slots?.map(s => s.code).join(", ") || "—"}</p>
         <div className="flex gap-1 mt-1 flex-wrap">
-          {first.items && first.items.length > 0 && <MaterialsBadge items={first.items} />}
-          {first.requested_softwares && <SoftwareBadge softwares={first.requested_softwares} label={first.software_installation_required ? "Instalar SW" : "SW Solicitado"} />}
+          <MaterialsBadge items={first.items || []} />
+          <SoftwareBadge softwares={first.requested_softwares} label={first.software_installation_required ? "Instalar SW" : "SW Solicitado"} />
         </div>
         {first.approval_notes && <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title={first.approval_notes}><Info size={10} /> {first.approval_notes.length > 50 ? first.approval_notes.slice(0, 50) + "…" : first.approval_notes}</p>}
       </td>
       <td className="px-4 py-4"><StatusBadge status={first.status} /></td>
       
       <td className="px-4 py-4 text-right align-middle">
-        {/* A mesma trava direta e garantida para os lotes */}
-        {first.status === ReservationStatus.AGUARDANDO_SOFTWARE ? (
+        {first.status === ReservationStatus.AGUARDANDO_SOFTWARE && canInstallSW ? (
           <button onClick={onConfirmSW} className="inline-flex whitespace-nowrap items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-md active:scale-95 ml-auto">
             <Download size={14} /> Concluir Instalação
           </button>
@@ -407,12 +482,12 @@ type ModalState =
 export function ReservationPageDTI() {
   const { user } = useAuth();
   
-  // DTI_ESTAGIARIO não aprova.
   const canApprove = user?.role === UserRole.DTI_TECNICO || user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
+  const canInstallSW = canApprove || user?.role === UserRole.DTI_ESTAGIARIO;
 
   const { showToast, ToastComponent } = useToast();
   const { data, loading, error, refetch } = useFetch(reservationsApi.listAll, [], true);
-  const { data: softwaresList } = useFetch(labsApi.listSoftwares, [], true);
+  const { data: softwaresList, refetch: refetchSoftwares } = useFetch(labsApi.listSoftwares, [], true);
 
   const [filter, setFilter]             = useState<string>(ReservationStatus.PENDENTE);
   const [viewMode, setViewMode]         = useState<"list" | "timetable">("list");
@@ -523,34 +598,41 @@ export function ReservationPageDTI() {
   if (viewMode === "timetable") return <TimetableWizard onClose={() => setViewMode("list")} />;
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-12">
       {ToastComponent}
 
-      {installTarget && (
-        <ConfirmInstallModal 
-          target={installTarget} 
-          softwares={softwaresList ?? []} 
-          onClose={() => setInstallTarget(null)} 
-          onConfirm={handleConfirmInstallation} 
-        />
-      )}
+      <AnimatePresence>
+        {installTarget && (
+          <ConfirmInstallModal 
+            target={installTarget} 
+            softwares={softwaresList ?? []} 
+            onClose={() => setInstallTarget(null)} 
+            onConfirm={handleConfirmInstallation} 
+            onSoftwareAdded={refetchSoftwares}
+          />
+        )}
+      </AnimatePresence>
 
-      {modal.type === "caveats" && <TextModal title="Aprovar com Ressalvas" subtitle="Descreva a ressalva — ela ficará visível ao professor no card da reserva." placeholder="Ex: Laboratório disponível a partir das 14h. Aguarde confirmação do técnico." confirmLabel="Confirmar Aprovação" confirmClass="bg-amber-500 hover:bg-amber-600" icon={<AlertTriangle size={20} className="text-amber-500" />} onConfirm={submitCaveats} onClose={() => setModal({ type: "none" })} loading={busy} />}
-      {modal.type === "reject" && <TextModal title={modal.groupId ? "Rejeitar Lote" : "Rejeitar Reserva"} subtitle="Informe o motivo da rejeição — ele será exibido ao professor." placeholder="Ex: Laboratório indisponível no período solicitado." confirmLabel="Confirmar Rejeição" confirmClass="bg-red-500 hover:bg-red-600" icon={<XCircle size={20} className="text-red-500" />} onConfirm={submitReject} onClose={() => setModal({ type: "none" })} loading={busy} />}
-      {modal.type === "sw" && <SwModal labName={modal.labName} professor={modal.professor} softwares={modal.softwares} onConfirm={submitSW} onClose={() => setModal({ type: "none" })} loading={busy} />}
+      <AnimatePresence>
+        {modal.type === "caveats" && <TextModal title="Aprovar com Ressalvas" subtitle="Descreva a ressalva — ela ficará visível ao professor no card da reserva." placeholder="Ex: Laboratório disponível a partir das 14h. Aguarde confirmação do técnico." confirmLabel="Confirmar Aprovação" confirmClass="bg-amber-500 hover:bg-amber-600" icon={<AlertTriangle size={20} className="text-amber-500" />} onConfirm={submitCaveats} onClose={() => setModal({ type: "none" })} loading={busy} />}
+        {modal.type === "reject" && <TextModal title={modal.groupId ? "Rejeitar Lote" : "Rejeitar Reserva"} subtitle="Informe o motivo da rejeição — ele será exibido ao professor." placeholder="Ex: Laboratório indisponível no período solicitado." confirmLabel="Confirmar Rejeição" confirmClass="bg-red-500 hover:bg-red-600" icon={<XCircle size={20} className="text-red-500" />} onConfirm={submitReject} onClose={() => setModal({ type: "none" })} loading={busy} />}
+        {modal.type === "sw" && <SwModal labName={modal.labName} professor={modal.professor} softwares={modal.softwares} onConfirm={submitSW} onClose={() => setModal({ type: "none" })} loading={busy} />}
+      </AnimatePresence>
 
-      {conflictWarning && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
-          <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-red-800">Conflito de Agenda Detectado</p>
-            <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
-          </div>
-          <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 shrink-0 mt-0.5"><X size={18} /></button>
-        </div>
-      )}
+      <AnimatePresence>
+        {conflictWarning && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4 overflow-hidden">
+            <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-red-800">Conflito de Agenda Detectado</p>
+              <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{conflictWarning}</p>
+            </div>
+            <button onClick={() => setConflict(null)} className="text-red-400 hover:text-red-700 shrink-0 mt-0.5"><X size={18} /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-neutral-900">{canApprove ? "Gerenciar Solicitações" : "Solicitações de Reserva"}</h2>
           <p className="text-sm text-neutral-500 mt-1">{canApprove ? "Aprove, rejeite e acompanhe os agendamentos. Ações disponíveis em cada linha." : "Visualize as solicitações de reserva em andamento."}</p>
@@ -558,7 +640,7 @@ export function ReservationPageDTI() {
         <button onClick={() => setViewMode("timetable")} className="bg-white border border-neutral-200 text-neutral-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-50 transition-colors shadow-sm self-start">
           <Search size={18} /> Verificar Grade
         </button>
-      </div>
+      </header>
 
       {!canApprove && (
         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3">
@@ -638,7 +720,7 @@ export function ReservationPageDTI() {
                     <th className="px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider">Horários</th>
                     <th className="px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-xs font-bold text-neutral-400 uppercase tracking-wider text-right w-48">
-                      Ações
+                      {canInstallSW ? "Ações" : ""}
                     </th>
                   </tr>
                 </thead>
@@ -648,7 +730,7 @@ export function ReservationPageDTI() {
                       const group = allGroups[unit.id];
                       const first = group[0];
                       return (
-                        <GroupRow key={unit.id} group={group} canApprove={canApprove}
+                        <GroupRow key={unit.id} group={group} canApprove={canApprove} canInstallSW={canInstallSW}
                           onApprove={() => approve(first.id, unit.id)}
                           onCaveats={() => setModal({ type: "caveats", id: first.id, groupId: unit.id })}
                           onScheduleSW={() => setModal({ type: "sw", id: first.id, groupId: unit.id,
@@ -661,7 +743,7 @@ export function ReservationPageDTI() {
                     }
                     const r = unit.r;
                     return (
-                      <SingleRow key={r.id} r={r} canApprove={canApprove}
+                      <SingleRow key={r.id} r={r} canApprove={canApprove} canInstallSW={canInstallSW}
                         onApprove={() => approve(r.id)}
                         onCaveats={() => setModal({ type: "caveats", id: r.id })}
                         onScheduleSW={() => setModal({ type: "sw", id: r.id,
@@ -694,6 +776,6 @@ export function ReservationPageDTI() {
           )
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -4,13 +4,14 @@
 import React, { useMemo, useState } from "react";
 import {
   Monitor, Calendar, Layers, CalendarDays, Building2,
-  Plus, ClipboardList, CheckCircle2, Clock, Filter
+  Plus, ClipboardList, CheckCircle2, Clock, Filter, X, ChevronDown
 } from "lucide-react";
-import { ReservationStatus, Reservation } from "../types";
+import { motion, AnimatePresence } from "motion/react";
+import { ReservationStatus, Reservation, ReservationItem } from "../types";
 import { useFetch } from "../hooks/useFetch";
 import { reservationsApi } from "../api/reservationsApi";
 import { LoadingSpinner, ErrorMessage } from "../components/ui";
-import { STATUS_STYLES, WEEKDAY_NAMES, StatusBadge, CustomDropdown } from "./reservationShared";
+import { WEEKDAY_NAMES, StatusBadge, CustomDropdown, SoftwareBadge, MaterialsBadge } from "./reservationShared";
 
 function StatsBar({ data }: { data: Reservation[] }) {
   const total     = data.length;
@@ -45,11 +46,15 @@ function StatsBar({ data }: { data: Reservation[] }) {
 }
 
 type CardItem = {
-  id: string; isGroup: boolean; labName?: string; blockName?: string;
+  id: string; isGroup: boolean; groupReservations?: Reservation[];
+  labName?: string; blockName?: string;
   status: ReservationStatus; dateDisplay: string; timeDisplay: string;
+  items?: ReservationItem[]; requested_softwares?: string | null; software_installation_required?: boolean;
 };
 
 function ReservationCard({ res }: { res: CardItem }) {
+  const [openDates, setOpenDates] = useState(false);
+
   const borderAccent: Record<string, string> = {
     [ReservationStatus.APROVADO]:            "border-l-4 border-l-emerald-400",
     [ReservationStatus.PENDENTE]:            "border-l-4 border-l-amber-400",
@@ -61,7 +66,13 @@ function ReservationCard({ res }: { res: CardItem }) {
   };
 
   return (
-    <div className={`bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow ${borderAccent[res.status] ?? ""}`}>
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ duration: 0.3 }}
+      className={`bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow ${borderAccent[res.status] ?? ""}`}
+    >
       <div className="flex justify-between items-start gap-2 mb-5">
         <StatusBadge status={res.status} />
         {res.isGroup && (
@@ -78,13 +89,72 @@ function ReservationCard({ res }: { res: CardItem }) {
         <p className="text-[11px] text-neutral-500 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-2">
           <Building2 size={12} className="text-neutral-400" /> {res.blockName ?? "—"}
         </p>
+
+        {/* Badges de Modais - Materiais e Softwares */}
+        <div className="flex gap-1.5 mt-4 flex-wrap">
+          {res.items && res.items.length > 0 && <MaterialsBadge items={res.items} />}
+          {res.requested_softwares && <SoftwareBadge softwares={res.requested_softwares} label={res.software_installation_required ? "Instalar SW" : "SW Solicitado"} />}
+        </div>
       </div>
-      <div className="mt-5 pt-4 border-t border-neutral-100 bg-neutral-50/50 -mx-6 -mb-6 px-6 py-4 rounded-b-2xl">
+      
+      <div className="mt-5 pt-4 border-t border-neutral-100 bg-neutral-50/50 -mx-6 -mb-6 px-6 py-4 rounded-b-2xl flex justify-between items-center">
         <span className="text-xs font-bold text-neutral-500 flex items-center gap-2">
           <CalendarDays size={14} className="text-neutral-400" /> {res.dateDisplay}
         </span>
+        
+        {/* Modal de visualização de múltiplas datas */}
+        {res.isGroup && res.groupReservations && (
+          <>
+            <button onClick={() => setOpenDates(true)} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-widest flex items-center gap-1">
+              Ver Datas <ChevronDown size={12} />
+            </button>
+
+            <AnimatePresence>
+              {openDates && (
+                <motion.div 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" 
+                  onClick={(e) => { e.stopPropagation(); setOpenDates(false); }}
+                >
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ duration: 0.2 }}
+                    className="bg-white rounded-3xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl" 
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-6 py-5 bg-neutral-50/50 border-b border-neutral-100 flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                        <CalendarDays size={20} className="text-sky-500" /> Datas Solicitadas
+                      </h3>
+                      <button onClick={() => setOpenDates(false)} className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-full transition-colors"><X size={20}/></button>
+                    </div>
+                    <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-2 bg-white">
+                      <div className="bg-sky-50 p-4 rounded-2xl border border-sky-100 mb-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700 mb-1">Resumo do Lote</p>
+                        <p className="text-sm font-bold text-sky-900">{res.groupReservations.length} aulas · Laboratório {res.labName}</p>
+                      </div>
+                      {res.groupReservations.sort((a, b) => a.date.localeCompare(b.date)).map(r => (
+                        <div key={r.id} className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-neutral-100 bg-neutral-50 hover:bg-neutral-100 transition-colors text-sm font-medium text-neutral-700">
+                          <span className="flex items-center gap-2">
+                            <CalendarDays size={14} className="text-neutral-400" />
+                            {new Date(r.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+                      <button onClick={() => setOpenDates(false)} className="px-6 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-700 hover:bg-neutral-100 transition-colors shadow-sm">
+                        Fechar
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -120,15 +190,19 @@ export function ReservationPageProfessor({ onNewReservation }: { onNewReservatio
         const firstDay = new Date(g[0].date + "T12:00:00").getDay();
         const isSemestral = g.every(r => new Date(r.date + "T12:00:00").getDay() === firstDay) && g.length >= 4;
         return {
-          id: g[0].group_id as string, isGroup: true, labName: g[0].laboratory?.name, blockName: g[0].laboratory?.block, status: g[0].status,
+          id: g[0].group_id as string, isGroup: true, groupReservations: g,
+          labName: g[0].laboratory?.name, blockName: g[0].laboratory?.block, status: g[0].status,
           dateDisplay: isSemestral ? `Toda ${WEEKDAY_NAMES[firstDay]} (${g.length} aulas)` : `Múltiplas Datas (${g.length} aulas)`,
           timeDisplay: g[0].slots?.map(sl => sl.code).join(", ") || "—", rawDate: new Date(g[0].created_at),
+          items: g[0].items, requested_softwares: g[0].requested_softwares, software_installation_required: g[0].software_installation_required
         };
       }),
       ...singles.map(s => ({
-        id: s.id.toString(), isGroup: false, labName: s.laboratory?.name, blockName: s.laboratory?.block, status: s.status,
+        id: s.id.toString(), isGroup: false,
+        labName: s.laboratory?.name, blockName: s.laboratory?.block, status: s.status,
         dateDisplay: new Date(s.date + "T12:00:00").toLocaleDateString("pt-BR"),
         timeDisplay: s.slots?.map(sl => sl.code).join(", ") || "—", rawDate: new Date(s.created_at),
+        items: s.items, requested_softwares: s.requested_softwares, software_installation_required: s.software_installation_required
       })),
     ];
 
@@ -176,7 +250,9 @@ export function ReservationPageProfessor({ onNewReservation }: { onNewReservatio
               </button>
             </div>
           ) : (
-            cards.map(res => <ReservationCard key={res.id} res={res} />)
+            <AnimatePresence>
+              {cards.map(res => <ReservationCard key={res.id} res={res} />)}
+            </AnimatePresence>
           )}
         </div>
       )}
