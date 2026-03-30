@@ -102,7 +102,7 @@ function CheckoutModal({ reservation, onClose, onDone }: { reservation: Reservat
         
         <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar bg-neutral-50/30">
           {reservation.items.map(item => (
-            <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200/60 transition-all hover:border-neutral-300">
+            <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200 transition-all hover:border-neutral-300">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Package size={14} /></div>
@@ -190,7 +190,7 @@ function CheckinModal({ reservation, onClose, onDone }: { reservation: Reservati
         
         <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar bg-neutral-50/30">
           {reservation.items.map(item => (
-            <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200/60 transition-all hover:border-neutral-300">
+            <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200 transition-all hover:border-neutral-300">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><RotateCcw size={14} /></div>
                 <p className="font-bold text-sm text-neutral-900">{item.model?.name}</p>
@@ -507,8 +507,8 @@ export function DailyPage() {
       {checkinTarget  && <CheckinModal  reservation={checkinTarget}  onClose={() => setCheckinTarget(null)}  onDone={refetch} />}
 
       {/* ── Barra Superior Fixa (Header & Filtros) com Agrupamento Dropdown ─ */}
-      <div className="sticky top-0 z-20 -mx-2 md:mx-0 px-2 md:px-0 pt-2 pb-4 bg-[#f1f4f8]/80 backdrop-blur-md">
-        <div className="bg-white border border-neutral-200/80 rounded-2xl shadow-sm ring-1 ring-black/5">
+      <div className="sticky top-0 z-20 -mx-2 md:mx-0 px-2 md:px-0 pt-2 pb-4 bg-neutral-50/50 backdrop-blur-md">
+        <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm ring-1 ring-black/5">
           
           <div className="flex flex-col lg:flex-row justify-between gap-4 px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 rounded-t-2xl">
             
@@ -611,12 +611,12 @@ export function DailyPage() {
                 <div className={`bg-white border flex flex-col transition-all duration-300 ${
                   isExpanded 
                     ? "border-neutral-900 shadow-xl rounded-t-2xl rounded-b-none border-b-0" 
-                    : "border-neutral-200/80 shadow-sm hover:shadow-md hover:border-neutral-300 rounded-2xl"
+                    : "border-neutral-200 shadow-sm hover:shadow-md hover:border-neutral-300 rounded-2xl"
                 }`}>
                   
                   {/* Lab Header */}
                   <div className={`px-4 py-4 border-b border-neutral-100 flex items-center gap-3 bg-neutral-50/50 ${isExpanded ? "rounded-t-2xl" : "rounded-t-2xl"}`}>
-                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200/60 flex items-center justify-center shrink-0 shadow-sm">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center shrink-0 shadow-sm">
                       <Monitor size={18} className="text-neutral-700" />
                     </div>
                     <div className="flex-1 min-w-0">

@@ -844,7 +844,7 @@ function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLo
             </table>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {filtered.length === 0
               ? <div className="col-span-4 text-center py-16 bg-white border border-dashed border-neutral-200 rounded-3xl">
                   <Package size={40} className="mx-auto text-neutral-200 mb-3" />
@@ -859,45 +859,45 @@ function StockTab({ search, setSearch, category, setCategory, onEdit, onQr, onLo
                     <div className="aspect-square bg-neutral-100 relative group">
                       {item.image_url
                         ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-                        : <div className="w-full h-full flex items-center justify-center text-5xl font-black text-neutral-200">{item.name.charAt(0)}</div>
+                        : <div className="w-full h-full flex items-center justify-center text-3xl md:text-5xl font-black text-neutral-200">{item.name.charAt(0)}</div>
                       }
-                      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[9px] font-black text-neutral-700 uppercase tracking-widest shadow-sm border border-black/5">
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[8px] font-black text-neutral-700 uppercase tracking-widest shadow-sm border border-black/5">
                         {CATEGORY_LABELS[item.category] ?? item.category}
                       </div>
                     </div>
-                    <div className="p-5 flex-1 flex flex-col">
-                      <h4 className="font-bold text-lg text-neutral-900 mb-1 leading-tight">{item.name}</h4>
-                      <p className="text-xs font-medium text-neutral-500 line-clamp-2 mb-4 leading-relaxed">{item.description}</p>
-                      
-                      <div className="mt-auto space-y-4">
-                        <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-100">
-                          <div className="flex justify-between text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">
-                            <span>Disp. P/ Aulas</span>
-                            <span className="text-neutral-900">{item.available_qty} de {item.total_stock}</span>
+                    <div className="p-3 flex-1 flex flex-col">
+                      <h4 className="font-bold text-sm text-neutral-900 mb-0.5 leading-tight line-clamp-2">{item.name}</h4>
+                      <p className="text-[10px] font-medium text-neutral-500 line-clamp-2 mb-2 leading-relaxed hidden md:block">{item.description}</p>
+
+                      <div className="mt-auto space-y-2">
+                        <div className="bg-neutral-50 rounded-xl p-2 border border-neutral-100">
+                          <div className="flex justify-between text-[9px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5">
+                            <span>Disponível</span>
+                            <span className="text-neutral-900">{item.available_qty}/{item.total_stock}</span>
                           </div>
-                          <div className="w-full h-2 bg-neutral-200/60 rounded-full overflow-hidden shadow-inner">
+                          <div className="w-full h-1.5 bg-neutral-200/60 rounded-full overflow-hidden shadow-inner">
                             <div className={`h-full rounded-full transition-all duration-1000 ${barColor}`} style={{ width: `${pct}%` }} />
                           </div>
                         </div>
 
                         {(item.in_use > 0 || item.in_loans > 0 || item.maintenance_stock > 0) && (
-                          <div className="flex gap-1.5 flex-wrap">
-                            {item.in_use > 0 && <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded font-bold tracking-wide shadow-sm">{item.in_use} em aula</span>}
-                            {item.in_loans > 0 && <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded font-bold tracking-wide shadow-sm">{item.in_loans} instit.</span>}
-                            {item.maintenance_stock > 0 && <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded font-bold tracking-wide shadow-sm">{item.maintenance_stock} avariado</span>}
+                          <div className="flex gap-1 flex-wrap">
+                            {item.in_use > 0 && <span className="text-[8px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold">{item.in_use} aula</span>}
+                            {item.in_loans > 0 && <span className="text-[8px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">{item.in_loans} emp.</span>}
+                            {item.maintenance_stock > 0 && <span className="text-[8px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-bold">{item.maintenance_stock} av.</span>}
                           </div>
                         )}
-                        <div className={`grid ${canManageItems ? 'grid-cols-3' : 'grid-cols-2'} gap-2 pt-2 border-t border-neutral-100`}>
+                        <div className={`grid ${canManageItems ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5 pt-2 border-t border-neutral-100`}>
                           {canManageItems && (
-                            <button onClick={() => onEdit(item)} className="flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
-                              <Edit2 size={16} /> <span className="text-[9px] font-bold uppercase tracking-wider">Editar</span>
+                            <button onClick={() => onEdit(item)} className="flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
+                              <Edit2 size={13} /> <span className="text-[8px] font-bold uppercase tracking-wider hidden sm:block">Editar</span>
                             </button>
                           )}
-                          <button onClick={() => onQr(item)} className="flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
-                            <QrCode size={16} /> <span className="text-[9px] font-bold uppercase tracking-wider">Gerar QR</span>
+                          <button onClick={() => onQr(item)} className="flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors active:scale-95">
+                            <QrCode size={13} /> <span className="text-[8px] font-bold uppercase tracking-wider hidden sm:block">QR</span>
                           </button>
-                          <button onClick={() => onLoan(item)} className="flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white transition-colors active:scale-95">
-                            <Package size={16} /> <span className="text-[9px] font-bold uppercase tracking-wider">Emprestar</span>
+                          <button onClick={() => onLoan(item)} className="flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white transition-colors active:scale-95">
+                            <Package size={13} /> <span className="text-[8px] font-bold uppercase tracking-wider hidden sm:block">Emp.</span>
                           </button>
                         </div>
                       </div>

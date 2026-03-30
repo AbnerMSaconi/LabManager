@@ -43,15 +43,15 @@ interface MenuItem { id: string; label: string; icon: React.ElementType; roles: 
 const MENU_ITEMS: MenuItem[] = [
   { id: "dashboard",    label: "Início",          icon: LayoutDashboard, roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "daily",        label: "Agenda do Dia",   icon: Clock,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "reservations", label: "Reservas",         icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "inventory",    label: "Almoxarifado",     icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "labs",         label: "Laboratórios",     icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "maintenance",  label: "Manutenção",       icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "movements",   label: "Movimentações",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "attendance",   label: "Lista de Presença", icon: UserCheck,       roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "governance",   label: "Governança",       icon: ShieldCheck,     roles: [UserRole.SUPER_ADMIN] },
+  { id: "reservations", label: "Reservas",        icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "inventory",    label: "Almoxarifado",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "labs",         label: "Laboratórios",    icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "maintenance",  label: "Manutenção",      icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "movements",    label: "Movimentações",   icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "users",        label: "Usuários",        icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "settings",     label: "Configurações",   icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "attendance",   label: "Lista de Presença", icon: UserCheck,      roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "governance",   label: "Governança",      icon: ShieldCheck,     roles: [UserRole.SUPER_ADMIN] },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -80,24 +80,21 @@ function DesktopSidebar({
 
   return (
     <motion.div
-      animate={{ width: collapsed ? 64 : 256 }}
+      animate={{ width: collapsed ? 72 : 260 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="flex flex-col h-full overflow-hidden"
-      style={{ background: "var(--bg-sidebar)" }}
+      className="flex flex-col h-full overflow-hidden bg-ucdb-blue shadow-xl border-r border-white/10"
     >
       {/* Logo */}
       <div
-        className="flex items-center border-b shrink-0"
+        className="flex items-center border-b border-white/10 shrink-0"
         style={{
-          borderColor: "rgba(255,255,255,0.08)",
-          height: 60,
-          padding: collapsed ? "0 0 0 0" : "0 20px",
+          height: 72,
+          padding: collapsed ? "0" : "0 20px",
           justifyContent: collapsed ? "center" : "flex-start",
         }}
       >
-        <div className="rounded-lg p-2 flex items-center justify-center shrink-0"
-          style={{ background: "var(--ucdb-gold)" }}>
-          <Building2 size={18} style={{ color: "var(--ucdb-blue-dark)" }} />
+        <div className="rounded-xl p-2.5 flex items-center justify-center shrink-0 bg-white/10">
+          <Building2 size={20} className="text-white" />
         </div>
         <AnimatePresence>
           {!collapsed && (
@@ -108,16 +105,16 @@ function DesktopSidebar({
               transition={{ duration: 0.15 }}
               className="ml-3 overflow-hidden whitespace-nowrap"
             >
-              <p className="font-bold text-sm leading-tight" style={{ color: "var(--text-sidebar)" }}>LabManager Pro</p>
-              <p className="text-[10px] font-medium" style={{ color: "var(--ucdb-gold)" }}>UCDB</p>
+              <p className="font-black text-[15px] leading-tight text-white tracking-tight">LabManager Pro</p>
+              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-0.5">Institucional</p>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-0.5"
-        style={{ padding: collapsed ? "16px 8px" : "16px 12px" }}>
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-6 space-y-1.5 custom-scrollbar"
+        style={{ padding: collapsed ? "24px 12px" : "24px 16px" }}>
         {items.map(item => {
           const active = activeTab === item.id;
           return (
@@ -125,18 +122,18 @@ function DesktopSidebar({
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               title={collapsed ? item.label : undefined}
-              className="w-full flex items-center rounded-xl text-sm font-medium transition-all"
+              className={`w-full flex items-center rounded-xl text-sm font-bold transition-all group ${
+                active 
+                  ? "bg-white/15 text-white shadow-sm ring-1 ring-white/20" 
+                  : "text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
               style={{
                 gap: collapsed ? 0 : 12,
-                padding: collapsed ? "10px 0" : "10px 12px",
+                padding: collapsed ? "12px 0" : "12px 14px",
                 justifyContent: collapsed ? "center" : "flex-start",
-                background: active ? "var(--ucdb-gold)" : "transparent",
-                color: active ? "var(--ucdb-blue-dark)" : "var(--text-sidebar)",
               }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; }}
-              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
-              <item.icon size={17} className="shrink-0" />
+              <item.icon size={18} className={`shrink-0 transition-colors ${active ? "text-white" : "text-white/60 group-hover:text-white"}`} />
               <AnimatePresence>
                 {!collapsed && (
                   <motion.span
@@ -157,99 +154,62 @@ function DesktopSidebar({
 
       {/* Footer */}
       <div
-        className="border-t shrink-0"
-        style={{
-          borderColor: "rgba(255,255,255,0.08)",
-          padding: collapsed ? "12px 8px" : "12px 12px",
-        }}
+        className="border-t border-white/10 shrink-0"
+        style={{ padding: collapsed ? "16px 12px" : "16px" }}
       >
-        {/* Botão expandir/recolher */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? "Expandir menu" : "Recolher menu"}
-          className="w-full flex items-center rounded-xl text-sm font-medium transition-all mb-1"
+          className="w-full flex items-center rounded-xl text-xs font-bold transition-all mb-2 text-white/40 hover:bg-white/10 hover:text-white"
           style={{
             gap: collapsed ? 0 : 12,
-            padding: collapsed ? "10px 0" : "10px 12px",
+            padding: collapsed ? "10px 0" : "10px 14px",
             justifyContent: collapsed ? "center" : "flex-start",
-            color: "var(--text-sidebar-muted)",
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
         >
-          {collapsed ? <ChevronRight size={17} className="shrink-0" /> : <ChevronLeft size={17} className="shrink-0" />}
+          {collapsed ? <ChevronRight size={16} className="shrink-0" /> : <ChevronLeft size={16} className="shrink-0" />}
           <AnimatePresence>
             {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.12 }}
-                className="overflow-hidden whitespace-nowrap"
-              >
-                Recolher menu
+              <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} transition={{ duration: 0.12 }} className="overflow-hidden whitespace-nowrap uppercase tracking-widest">
+                Recolher Menu
               </motion.span>
             )}
           </AnimatePresence>
         </button>
 
-        {/* Dark mode toggle */}
         <button
           onClick={toggleDark}
           title={collapsed ? (dark ? "Modo claro" : "Modo escuro") : undefined}
-          className="w-full flex items-center rounded-xl text-sm font-medium transition-all mb-1"
+          className="w-full flex items-center rounded-xl text-xs font-bold transition-all mb-4 text-white/40 hover:bg-white/10 hover:text-white"
           style={{
             gap: collapsed ? 0 : 12,
-            padding: collapsed ? "10px 0" : "10px 12px",
+            padding: collapsed ? "10px 0" : "10px 14px",
             justifyContent: collapsed ? "center" : "flex-start",
-            color: "var(--text-sidebar-muted)",
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
         >
-          {dark ? <Sun size={17} className="shrink-0" /> : <Moon size={17} className="shrink-0" />}
+          {dark ? <Sun size={16} className="shrink-0" /> : <Moon size={16} className="shrink-0" />}
           <AnimatePresence>
             {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.12 }}
-                className="overflow-hidden whitespace-nowrap"
-              >
-                {dark ? "Modo claro" : "Modo escuro"}
+              <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} transition={{ duration: 0.12 }} className="overflow-hidden whitespace-nowrap uppercase tracking-widest">
+                {dark ? "Modo Claro" : "Modo Escuro"}
               </motion.span>
             )}
           </AnimatePresence>
         </button>
 
-        {/* User info */}
-        <div
-          className="flex items-center py-2"
-          style={{
-            gap: collapsed ? 0 : 12,
-            padding: collapsed ? "8px 0" : "8px 12px",
-            justifyContent: collapsed ? "center" : "flex-start",
-          }}
-        >
+        {/* User info Card */}
+        <div className={`flex items-center bg-white/5 border border-white/10 rounded-2xl transition-all ${collapsed ? "p-2 justify-center" : "p-3 gap-3"}`}>
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
-            style={{ background: "var(--ucdb-gold)", color: "var(--ucdb-blue-dark)" }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 bg-white text-ucdb-blue shadow-sm"
             title={collapsed ? `${user.full_name} · ${ROLE_LABELS[user.role]}` : undefined}
           >
             {user.full_name.charAt(0)}
           </div>
           <AnimatePresence>
             {!collapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.12 }}
-                className="flex-1 min-w-0 overflow-hidden"
-              >
-                <p className="text-sm font-semibold truncate" style={{ color: "var(--text-sidebar)" }}>{user.full_name}</p>
-                <p className="text-[10px] truncate" style={{ color: "var(--ucdb-gold)" }}>{ROLE_LABELS[user.role]}</p>
+              <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} transition={{ duration: 0.12 }} className="flex-1 min-w-0 overflow-hidden pr-2">
+                <p className="text-sm font-bold text-white truncate leading-tight">{user.full_name}</p>
+                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-0.5 truncate">{ROLE_LABELS[user.role]}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -259,27 +219,18 @@ function DesktopSidebar({
         <button
           onClick={logout}
           title={collapsed ? "Sair" : undefined}
-          className="w-full flex items-center rounded-xl text-sm font-medium transition-all"
+          className="w-full flex items-center rounded-xl text-sm font-bold transition-all mt-3 text-red-400 hover:bg-red-500/10 hover:text-red-300"
           style={{
             gap: collapsed ? 0 : 12,
-            padding: collapsed ? "10px 0" : "10px 12px",
+            padding: collapsed ? "12px 0" : "12px 14px",
             justifyContent: collapsed ? "center" : "flex-start",
-            color: "#f87171",
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
         >
-          <LogOut size={17} className="shrink-0" />
+          <LogOut size={16} className="shrink-0" />
           <AnimatePresence>
             {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.12 }}
-                className="overflow-hidden whitespace-nowrap"
-              >
-                Sair
+              <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} transition={{ duration: 0.12 }} className="overflow-hidden whitespace-nowrap">
+                Terminar Sessão
               </motion.span>
             )}
           </AnimatePresence>
@@ -304,39 +255,37 @@ function MobileSidebarContent({
   const items = MENU_ITEMS.filter(i => i.roles.includes(user.role));
 
   return (
-    <div className="flex flex-col h-full w-64" style={{ background: "var(--bg-sidebar)" }}>
+    <div className="flex flex-col h-full w-72 bg-ucdb-blue shadow-2xl border-r border-white/10">
       {/* Logo */}
-      <div className="px-5 py-4 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <div className="px-6 py-5 flex items-center justify-between border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg p-2 flex items-center justify-center" style={{ background: "var(--ucdb-gold)" }}>
-            <Building2 size={18} style={{ color: "var(--ucdb-blue-dark)" }} />
+          <div className="rounded-xl p-2.5 flex items-center justify-center bg-white/10">
+            <Building2 size={20} className="text-white" />
           </div>
           <div>
-            <p className="font-bold text-sm leading-tight" style={{ color: "var(--text-sidebar)" }}>LabManager Pro</p>
-            <p className="text-[10px] font-medium" style={{ color: "var(--ucdb-gold)" }}>UCDB</p>
+            <p className="font-black text-[15px] leading-tight text-white tracking-tight">LabManager Pro</p>
+            <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-0.5">Institucional</p>
           </div>
         </div>
-        <button onClick={onClose} style={{ color: "var(--text-sidebar-muted)" }} className="p-1 rounded hover:opacity-70">
-          <X size={18} />
+        <button onClick={onClose} className="p-2 rounded-lg text-white/50 hover:bg-white/10 hover:text-white transition-colors">
+          <X size={20} />
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1.5 custom-scrollbar">
         {items.map(item => {
           const active = activeTab === item.id;
           return (
             <button key={item.id}
               onClick={() => { setActiveTab(item.id); onClose(); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{
-                background: active ? "var(--ucdb-gold)" : "transparent",
-                color: active ? "var(--ucdb-blue-dark)" : "var(--text-sidebar)",
-              }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; }}
-              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all group ${
+                active 
+                  ? "bg-white/15 text-white shadow-sm ring-1 ring-white/20" 
+                  : "text-white/60 hover:bg-white/10 hover:text-white"
+              }`}
             >
-              <item.icon size={17} />
+              <item.icon size={18} className={`shrink-0 transition-colors ${active ? "text-white" : "text-white/60 group-hover:text-white"}`} />
               {item.label}
             </button>
           );
@@ -344,35 +293,28 @@ function MobileSidebarContent({
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-4 space-y-1 border-t pt-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <div className="px-4 py-6 space-y-2 border-t border-white/10">
         <button onClick={toggleDark}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-          style={{ color: "var(--text-sidebar-muted)" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all text-white/50 hover:bg-white/10 hover:text-white uppercase tracking-widest mb-4"
         >
-          {dark ? <Sun size={17} /> : <Moon size={17} />}
+          {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo escuro"}
         </button>
 
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
-            style={{ background: "var(--ucdb-gold)", color: "var(--ucdb-blue-dark)" }}>
+        <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-base shrink-0 bg-white text-ucdb-blue shadow-sm">
             {user.full_name.charAt(0)}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate" style={{ color: "var(--text-sidebar)" }}>{user.full_name}</p>
-            <p className="text-[10px] truncate" style={{ color: "var(--ucdb-gold)" }}>{ROLE_LABELS[user.role]}</p>
+          <div className="flex-1 min-w-0 pr-2">
+            <p className="text-sm font-bold text-white truncate leading-tight">{user.full_name}</p>
+            <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-0.5 truncate">{ROLE_LABELS[user.role]}</p>
           </div>
         </div>
 
         <button onClick={() => { logout(); onClose(); }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-          style={{ color: "#f87171" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all mt-2 text-red-400 hover:bg-red-500/10 hover:text-red-300"
         >
-          <LogOut size={17} /> Sair
+          <LogOut size={16} /> Terminar Sessão
         </button>
       </div>
     </div>
@@ -390,11 +332,10 @@ function Shell() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-tertiary)" }}>
-        <div className="flex flex-col items-center gap-4" style={{ color: "var(--text-tertiary)" }}>
-          <div className="w-10 h-10 border-2 rounded-full animate-spin"
-            style={{ borderColor: "var(--border)", borderTopColor: "var(--ucdb-blue)" }} />
-          <p className="text-sm">Carregando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="flex flex-col items-center gap-4 text-ucdb-blue">
+          <div className="w-10 h-10 border-[3px] rounded-full animate-spin border-neutral-200 border-t-ucdb-blue" />
+          <p className="text-sm font-bold uppercase tracking-widest">Carregando Sistema...</p>
         </div>
       </div>
     );
@@ -405,9 +346,9 @@ function Shell() {
   const handleWizardComplete = () => { setShowWizard(false); setActiveTab("reservations"); };
 
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--bg-tertiary)" }}>
+    <div className="flex min-h-screen bg-neutral-50">
       {/* Sidebar desktop */}
-      <div className="hidden md:flex h-screen sticky top-0 shrink-0" style={{ boxShadow: "var(--shadow-md)" }}>
+      <div className="hidden md:flex h-screen sticky top-0 shrink-0 z-40">
         <DesktopSidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -423,11 +364,11 @@ function Shell() {
         {mobileSidebar && (
           <>
             <motion.div key="ov" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 md:hidden" style={{ background: "rgba(0,0,0,0.5)" }}
+              className="fixed inset-0 z-40 md:hidden bg-black/60 backdrop-blur-sm"
               onClick={() => setMobileSidebar(false)} />
-            <motion.div key="dr" initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+            <motion.div key="dr" initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
-              className="fixed inset-y-0 left-0 z-50 md:hidden h-full shadow-2xl">
+              className="fixed inset-y-0 left-0 z-50 md:hidden h-full">
               <MobileSidebarContent
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -442,31 +383,30 @@ function Shell() {
 
       {/* Main */}
       <main className="flex-1 min-w-0 flex flex-col">
-        {/* Mobile topbar */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b sticky top-0 z-30"
-          style={{ background: "var(--bg-sidebar)", borderColor: "rgba(255,255,255,0.08)" }}>
-          <button onClick={() => setMobileSidebar(true)} className="p-2 rounded-lg" style={{ color: "var(--text-sidebar)" }}>
+        {/* Mobile topbar (Azul Marinho também para manter consistência) */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 sticky top-0 z-30 bg-ucdb-blue shadow-md border-b border-white/10">
+          <button onClick={() => setMobileSidebar(true)} className="p-2 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors">
             <Menu size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <Building2 size={16} style={{ color: "var(--ucdb-gold)" }} />
-            <span className="font-bold text-sm" style={{ color: "var(--text-sidebar)" }}>LabManager Pro</span>
+            <Building2 size={16} className="text-white" />
+            <span className="font-black text-sm text-white tracking-tight">LabManager</span>
           </div>
-          <button onClick={toggleDark} className="ml-auto p-2 rounded-lg" style={{ color: "var(--text-sidebar)" }}>
+          <button onClick={toggleDark} className="ml-auto p-2 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors">
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 p-4 md:p-8 overflow-y-auto">
-          <div className="max-w-6xl mx-auto">
+        {/* Content Area */}
+        <div className="flex-1 p-4 md:p-8 overflow-y-auto relative">
+          <div className="max-w-[1400px] mx-auto w-full">
             <AnimatePresence mode="wait">
               {showWizard ? (
-                <motion.div key="wiz" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                <motion.div key="wiz" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.2 }}>
                   <ReservationWizard onComplete={handleWizardComplete} onCancel={() => setShowWizard(false)} />
                 </motion.div>
               ) : (
-                <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                <motion.div key={activeTab} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.2 }}>
                   {activeTab === "dashboard"    && <DashboardPage onNewReservation={() => setShowWizard(true)} onNavigate={setActiveTab} />}
                   {activeTab === "daily"        && <DailyPage />}
                   {activeTab === "reservations" && <ReservationsPage onNewReservation={() => setShowWizard(true)} />}
@@ -491,7 +431,7 @@ function Shell() {
 export default function App() {
   return (
     <AuthProvider>
-      <SSEListener /> {/* 🔹 Adicionado aqui para rodar de forma invisível */}
+      <SSEListener />
       <Shell />
     </AuthProvider>
   );

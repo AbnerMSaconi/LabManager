@@ -482,7 +482,7 @@ export function LabsPage() {
   
   const [catalogSearch, setCatalogSearch] = useState("");
 
-  const canEdit = user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN;
+  const canEdit = user?.role === UserRole.ADMINISTRADOR || user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.DTI_TECNICO;
 
   const handleCreateLab = async (p: any) => {
     try { await labsApi.create(p); showToast("Laboratório criado.", "success"); setShowForm(false); refetch(); } 
