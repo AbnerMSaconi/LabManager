@@ -30,7 +30,7 @@ export default function SysAdminPage() {
   const [loading, setLoading] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [confirmingReset, setConfirmingReset] = useState(false);
-  const { showToast, ToastContainer } = useToast();
+  const { showToast, ToastComponent } = useToast();
 
   useEffect(() => {
     if (tab === 'lixeira') loadQuarantine();
@@ -142,7 +142,7 @@ export default function SysAdminPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <ToastContainer />
+      {ToastComponent}
       <div className="mb-6">
         <h1 className="text-2xl font-bold" style={{ color: 'var(--ucdb-blue)' }}>
           Governança do Sistema
@@ -177,7 +177,7 @@ export default function SysAdminPage() {
           {loading ? (
             <p className="text-gray-400">Carregando...</p>
           ) : quarantine ? (
-            Object.entries(quarantine).map(([tableName, records]) => (
+            (Object.entries(quarantine) as [string, { id: number; name: string; deleted_at: string }[]][]).map(([tableName, records]) => (
               records.length > 0 && (
                 <div key={tableName} className="mb-6">
                   <h3 className="font-semibold text-gray-700 mb-2">{TABLE_LABELS[tableName] ?? tableName}</h3>

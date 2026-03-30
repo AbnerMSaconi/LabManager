@@ -350,7 +350,7 @@ export function LabsPage() {
           {canEdit && (
             <button onClick={() => { setShowForm(true); setEditTarget(null); }}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all bg-neutral-900 text-white hover:bg-neutral-800 shadow-md shadow-neutral-900/20 active:scale-95">
-              <Plus size={16} /> <span className="hidden sm:inline">Cadastrar Lab</span>
+              <Plus size={14} /> <span className="hidden sm:inline">Cadastrar Lab</span>
             </button>
           )}
         </div>

@@ -180,3 +180,23 @@ export interface BackupEntry {
   size_mb: number | null;
   triggered_by_id: number | null;
 }
+
+export type AttendanceStatus = "presente" | "falta" | "adiado" | "justificada" | "feriado";
+
+export interface AttendanceRow {
+  reservation_id: number;
+  professor_id: number;
+  professor_name: string;
+  lab_id: number | null;
+  lab_name: string | null;
+  date: string;
+  slots: LessonSlot[];
+  attendance_status: AttendanceStatus | null;
+  consecutive_absences: number;
+  alert: boolean;
+}
+
+export interface AttendanceBatchItem {
+  reservation_id: number;
+  status: AttendanceStatus;
+}

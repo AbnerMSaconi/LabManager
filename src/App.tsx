@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, Calendar, Package, Monitor,
   LogOut, Clock, Wrench, Building2,
-  Menu, X, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, ShieldCheck,
+  Menu, X, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, ShieldCheck, UserCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole } from "./types";
@@ -20,6 +20,7 @@ import { MovementsPage }     from "./pages/MovementsPage";
 import { SSEListener } from './components/SSEListener';
 import { SettingsPage } from "./pages/SettingsPage";
 import SysAdminPage from "./pages/SysAdminPage";
+import { AttendancePage } from "./pages/AttendancePage";
 
 // ── Dark mode hook ────────────────────────────────────────────────────────────
 function useDarkMode() {
@@ -49,6 +50,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: "movements",   label: "Movimentações",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "users",        label: "Usuários",         icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "settings",     label: "Configurações",    icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "attendance",   label: "Lista de Presença", icon: UserCheck,       roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "governance",   label: "Governança",       icon: ShieldCheck,     roles: [UserRole.SUPER_ADMIN] },
 ];
 
@@ -474,6 +476,7 @@ function Shell() {
                   {activeTab === "movements"   && <MovementsPage />}
                   {activeTab === "users"        && <UsersPage />}
                   {activeTab === "settings"     && <SettingsPage />}
+                  {activeTab === "attendance"   && <AttendancePage />}
                   {activeTab === "governance"   && <SysAdminPage />}
                 </motion.div>
               )}

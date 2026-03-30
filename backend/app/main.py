@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.routes import auth, health, users, maintenance, reservations, logistics, labs, inventory, sse, admin
+from .api.routes import auth, health, users, maintenance, reservations, logistics, labs, inventory, sse, admin, attendance
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ app.include_router(labs.router)
 app.include_router(inventory.router)
 app.include_router(sse.router)
 app.include_router(admin.router)
+app.include_router(attendance.router)
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger

@@ -250,3 +250,14 @@ class SystemBackup(Base):
     size_mb:          Mapped[Optional[float]] = mapped_column(nullable=True)
     triggered_by_id:  Mapped[Optional[int]]   = mapped_column(ForeignKey("users.id"), nullable=True)
     triggered_by:     Mapped[Optional["User"]] = relationship(foreign_keys=[triggered_by_id])
+
+
+class TeacherAttendance(Base):
+    __tablename__ = "teacher_attendances"
+    id:                Mapped[int]            = mapped_column(primary_key=True)
+    reservation_id:    Mapped[int]            = mapped_column(ForeignKey("reservations.id"), unique=True)
+    status:            Mapped[str]            = mapped_column(String(30))  # presente, falta, adiado, justificada, feriado
+    registered_by_id:  Mapped[Optional[int]]  = mapped_column(ForeignKey("users.id"), nullable=True)
+    registered_at:     Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    reservation:       Mapped["Reservation"]  = relationship(foreign_keys=[reservation_id])
+    registered_by:     Mapped[Optional["User"]] = relationship(foreign_keys=[registered_by_id])

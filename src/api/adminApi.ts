@@ -1,29 +1,29 @@
-import apiClient from './client';
+import { api } from './client';
 import type { QuarantineData, AuditLogEntry, BackupEntry } from '../types';
 
 export const adminApi = {
   // Quarentena
   getQuarantine: () =>
-    apiClient.get<QuarantineData>('/api/v1/admin/quarantine').then(r => r.data),
+    api.get<QuarantineData>('/api/v1/admin/quarantine'),
   restoreRecord: (table: string, id: number) =>
-    apiClient.post(`/api/v1/admin/restore/${table}/${id}`).then(r => r.data),
+    api.post<unknown>(`/api/v1/admin/restore/${table}/${id}`, {}),
   destroyRecord: (table: string, id: number) =>
-    apiClient.delete(`/api/v1/admin/destroy/${table}/${id}`).then(r => r.data),
+    api.delete<unknown>(`/api/v1/admin/destroy/${table}/${id}`),
 
   // Auditoria
   getAuditLogs: (limit = 100) =>
-    apiClient.get<AuditLogEntry[]>(`/api/v1/admin/audit-logs?limit=${limit}`).then(r => r.data),
+    api.get<AuditLogEntry[]>(`/api/v1/admin/audit-logs?limit=${limit}`),
   revertEdit: (auditId: number) =>
-    apiClient.post(`/api/v1/admin/revert-edit/${auditId}`).then(r => r.data),
+    api.post<unknown>(`/api/v1/admin/revert-edit/${auditId}`, {}),
 
   // Backups
   createBackup: () =>
-    apiClient.post('/api/v1/admin/backup').then(r => r.data),
+    api.post<BackupEntry>('/api/v1/admin/backup', {}),
   listBackups: () =>
-    apiClient.get<BackupEntry[]>('/api/v1/admin/backups').then(r => r.data),
+    api.get<BackupEntry[]>('/api/v1/admin/backups'),
   downloadBackupUrl: (id: number) => `/api/v1/admin/backups/${id}/download`,
 
   // Reset semestral
   semesterReset: (password: string) =>
-    apiClient.post('/api/v1/admin/semester-reset', { password }).then(r => r.data),
+    api.post<unknown>('/api/v1/admin/semester-reset', { password }),
 };

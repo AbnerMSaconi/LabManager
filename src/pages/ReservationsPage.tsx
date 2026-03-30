@@ -20,7 +20,10 @@ export function ReservationsPage({ onNewReservation }: { onNewReservation: () =>
   if (user.role === UserRole.PROFESSOR)
     return <ReservationPageProfessor onNewReservation={onNewReservation} />;
 
-  if (user.role === UserRole.PROGEX || user.role === UserRole.ADMINISTRADOR || user.role === UserRole.SUPER_ADMIN)
+  if (user.role === UserRole.SUPER_ADMIN)
+    return <ReservationPageDTI />;
+
+  if (user.role === UserRole.PROGEX || user.role === UserRole.ADMINISTRADOR)
     return <ReservationPageProgex onNewReservation={onNewReservation} />;
 
   // DTI_TECNICO e DTI_ESTAGIARIO — a página detecta o role internamente
