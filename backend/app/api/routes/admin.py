@@ -16,6 +16,7 @@ from ...models.base_models import (
     AuditLog, SystemBackup,
     Reservation, ReservationSlot, ReservationItem,
     MaintenanceTicket, InventoryMovement, InstitutionLoan,
+    TeacherAttendance,
 )
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -311,17 +312,22 @@ async def semester_reset(
             InventoryMovement.reservation_id != None
         ).delete(synchronize_session=False)
 
-        # 2. Reservas (CASCADE apaga reservation_slots e reservation_items automaticamente)
+        #2. Apagar dependências das reservas explicitamente para evitar erro de Foreign Key
+        db.query(TeacherAttendance).delete(synchronize_session=False)
+        db.query(ReservationItem).delete(synchronize_session=False)
+        db.query(ReservationSlot).delete(synchronize_session=False)
+
+        # 3. Reservas (CASCADE apaga reservation_slots e reservation_items automaticamente)
         db.query(Reservation).delete(synchronize_session=False)
 
-        # 3. Tickets de manutenção APENAS os resolvidos
+        # 4. Tickets de manutenção APENAS os resolvidos
         db.query(MaintenanceTicket).filter(
             MaintenanceTicket.status == "resolvido"
         ).delete(synchronize_session=False)
 
-        # 4. Empréstimos institucionais APENAS os finalizados
+        # 5. Empréstimos institucionais APENAS os finalizados
         db.query(InstitutionLoan).filter(
-            InstitutionLoan.status.in_(["devolvido", "devolvido_com_avaria"])
+            InstitutionLoan.status != "em_aberto"
         ).delete(synchronize_session=False)
 
         db.commit()

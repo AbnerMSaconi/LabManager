@@ -43,15 +43,15 @@ interface MenuItem { id: string; label: string; icon: React.ElementType; roles: 
 const MENU_ITEMS: MenuItem[] = [
   { id: "dashboard",    label: "Início",          icon: LayoutDashboard, roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "daily",        label: "Agenda do Dia",   icon: Clock,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "reservations", label: "Reservas",        icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "inventory",    label: "Almoxarifado",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "reservations", label: "Solicitações",        icon: Calendar,        roles: [UserRole.PROFESSOR, UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "labs",         label: "Laboratórios",    icon: Monitor,         roles: [UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "maintenance",  label: "Manutenção",      icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "movements",    label: "Movimentações",   icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "users",        label: "Usuários",        icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
-  { id: "settings",     label: "Configurações",   icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "attendance",   label: "Lista de Presença", icon: UserCheck,      roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "inventory",    label: "Almoxarifado",    icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROFESSOR, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "movements",    label: "Movimentações",   icon: Package,         roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "maintenance",  label: "Manutenção",      icon: Wrench,          roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
+  { id: "users",        label: "Usuários",        icon: Users,           roles: [UserRole.DTI_TECNICO, UserRole.DTI_ESTAGIARIO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
   { id: "governance",   label: "Governança",      icon: ShieldCheck,     roles: [UserRole.SUPER_ADMIN] },
+  { id: "settings",     label: "Configurações",   icon: Settings,        roles: [UserRole.PROFESSOR, UserRole.DTI_ESTAGIARIO, UserRole.DTI_TECNICO, UserRole.PROGEX, UserRole.ADMINISTRADOR, UserRole.SUPER_ADMIN] },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {

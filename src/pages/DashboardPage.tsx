@@ -104,41 +104,65 @@ function LiveLabMap({ onTitleClick, inverted = false, customTitle = "Ocupação 
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {displayedLabs.map(lab => {
-          const currentRes = today?.find(r => r.lab_id === lab.id && r.status === ReservationStatus.EM_USO);
-          const isOccupied = !!currentRes;
+      {displayedLabs.map(lab => {
+        // 1. Horário atual em minutos
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-          return (
-            <div key={lab.id} className={`p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[110px] ${isOccupied ? "bg-blue-50/50 border-blue-200 shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
-               <div className="flex justify-between items-start mb-2 gap-2">
-                 <span className={`font-bold text-sm truncate ${inverted && isOccupied ? "text-blue-800" : "text-neutral-800"}`} title={inverted && isOccupied ? currentRes.user?.full_name : lab.name}>
-                   {inverted && isOccupied ? currentRes.user?.full_name : lab.name}
-                 </span>
-                 {isOccupied ? (
-                    <span className="flex h-2.5 w-2.5 relative shrink-0 mt-1">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
-                    </span>
-                 ) : (
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shrink-0 mt-1" title="Livre"></span>
-                 )}
-               </div>
-               
-               {isOccupied ? (
-                 <div className={`text-xs mt-1 ${inverted ? "text-neutral-600" : "text-blue-800"}`}>
-                   <p className="font-medium truncate" title={inverted ? lab.name : currentRes.user?.full_name}>
-                     {inverted ? <><Building2 size={10} className="inline mr-1 -mt-0.5"/>{lab.name}</> : currentRes.user?.full_name}
-                   </p>
-                   <p className={`mt-1 text-[10px] uppercase tracking-wider ${inverted ? "text-blue-600 font-bold" : "opacity-80 font-bold"}`}>
-                     {inverted ? "Em aula agora" : "Em aula agora"}
-                   </p>
-                 </div>
-               ) : (
-                 <p className="text-xs text-neutral-400 mt-auto font-bold uppercase tracking-wider">{inverted ? "Sem professor" : "Livre"}</p>
-               )}
+        // 2. Pegamos TODAS as reservas deste laboratório para hoje
+        // (A API 'listToday' já traz apenas Aprovado, Em Uso e Aguardando Software)
+        const labReservations = today?.filter(r => r.lab_id === lab.id) || [];
+
+        // 3. Cruzamos o horário atual com o horário dos slots da reserva
+        const currentRes = labReservations.find(r => {
+          if (!r.slots || r.slots.length === 0) return false;
+          
+          // Pega o início da primeira aula e o fim da última aula daquele bloco
+          const sortedSlots = [...r.slots].sort((a, b) => a.start_time.localeCompare(b.start_time));
+          
+          const [startH, startM] = sortedSlots[0].start_time.split(':').map(Number);
+          const startMins = startH * 60 + startM;
+          
+          const [endH, endM] = sortedSlots[sortedSlots.length - 1].end_time.split(':').map(Number);
+          const endMins = endH * 60 + endM;
+          
+          // Está em aula se o relógio estiver entre 15 min ANTES do início até 60 min DEPOIS do fim
+          return currentMinutes >= (startMins - 15) && currentMinutes <= (endMins + 60);
+        });
+
+        const isOccupied = !!currentRes;
+
+        return (
+          <div key={lab.id} className={`p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[110px] ${isOccupied ? "bg-blue-50/50 border-blue-200 shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
+            <div className="flex justify-between items-start mb-2 gap-2">
+              <span className={`font-bold text-sm truncate ${inverted && isOccupied ? "text-blue-800" : "text-neutral-800"}`} title={inverted && isOccupied ? currentRes.user?.full_name : lab.name}>
+                {inverted && isOccupied ? currentRes.user?.full_name : lab.name}
+              </span>
+              {isOccupied ? (
+                  <span className="flex h-2.5 w-2.5 relative shrink-0 mt-1">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
+                  </span>
+              ) : (
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shrink-0 mt-1" title="Livre"></span>
+              )}
             </div>
-          )
-        })}
+            
+            {isOccupied ? (
+              <div className={`text-xs mt-1 ${inverted ? "text-neutral-600" : "text-blue-800"}`}>
+                <p className="font-medium truncate" title={inverted ? lab.name : currentRes.user?.full_name}>
+                  {inverted ? <><Building2 size={10} className="inline mr-1 -mt-0.5"/>{lab.name}</> : currentRes.user?.full_name}
+                </p>
+                <p className={`mt-1 text-[10px] uppercase tracking-wider ${inverted ? "text-blue-600 font-bold" : "opacity-80 font-bold"}`}>
+                  {inverted ? "Em aula agora" : "Em aula agora"}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-400 mt-auto font-bold uppercase tracking-wider">{inverted ? "Sem professor" : "Livre"}</p>
+            )}
+          </div>
+        )
+      })}
         {displayedLabs.length === 0 && (
           <div className="col-span-full text-center py-12 text-neutral-400 text-sm border-2 border-dashed border-neutral-200 rounded-2xl">
             Nenhum laboratório encontrado para este bloco.
