@@ -38,13 +38,23 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-// Proxy API requests to the Python backend
-app.use('/api', createProxyMiddleware({ 
-  target: 'http://localhost:8000', 
+// Proxy para o Keycloak — evita CORS entre portas diferentes no Chrome
+app.use('/keycloak', createProxyMiddleware({
+  target: 'http://localhost:8080',
   changeOrigin: true,
-  pathRewrite: {
-    '^/api': '/api', // keep /api prefix
-  },
+  pathRewrite: { '^/keycloak': '' },
+}));
+
+// Proxy específico para o backend C# (auth/sync via Keycloak) — deve vir ANTES do proxy geral
+app.use('/api/v1/auth/sync', createProxyMiddleware({
+  target: 'http://localhost:5165',
+  changeOrigin: true,
+}));
+
+// Proxy geral para o backend Python (FastAPI)
+app.use('/api', createProxyMiddleware({
+  target: 'http://localhost:8000',
+  changeOrigin: true,
 }));
 
 // --- VITE MIDDLEWARE ---

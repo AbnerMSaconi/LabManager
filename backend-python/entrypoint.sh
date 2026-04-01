@@ -35,10 +35,10 @@ echo "🔄 Rodando migrações Alembic..."
 alembic upgrade head
 
 echo "🌱 Populando dados iniciais..."
-python -m backend.seed || echo "⚠️  Seed concluído com avisos (dados já existentes ou erro não-fatal)."
+python -m seed || echo "⚠️  Seed concluído com avisos (dados já existentes ou erro não-fatal)."
 
 echo "🚀 Iniciando servidor com Gunicorn..."
-exec gunicorn backend.app.main:app \
+exec gunicorn app.main:app \
     --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:8000 \

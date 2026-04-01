@@ -2,8 +2,8 @@
 Seed inicial do banco de dados — LabManager Pro
 (Infraestrutura Real & Teste de Estresse SEMANAL MÁXIMO)
 """
-from backend.app.core.database import SessionLocal
-from backend.app.models.base_models import (
+from app.core.database import SessionLocal
+from app.models.base_models import (
     LessonSlot, User, Laboratory, Software, ItemModel,
     Reservation, ReservationSlot, ReservationItem,
     ReservationStatus, PhysicalItem, ItemStatus,
