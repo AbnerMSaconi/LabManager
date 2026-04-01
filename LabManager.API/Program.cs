@@ -9,99 +9,93 @@ using LabManager.API.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+// 1. BLINDAGEM DO PADRÃO JWT (Garante que "sub" permaneça "sub")
+System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
+// 2. SERVIÇOS NATIVOS
 builder.Services.AddHealthChecks();
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Política Global: Aceita token Local ou do Keycloak indiscriminadamente
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
+        JwtBearerDefaults.AuthenticationScheme, "Keycloak")
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
-// Snake_case para todas as respostas JSON (Minimal APIs e Controllers)
-builder.Services.ConfigureHttpJsonOptions(o =>
-    o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
-builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o =>
-    o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
+// Padronização Snake_case para respostas JSON (Minimal APIs)
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
 
-// CORS — permite qualquer origem em desenvolvimento
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+    options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
-// 1. INJEÇÃO DO BANCO DE DADOS
+
+// 3. BANCO DE DADOS
 builder.Services.AddDbContext<LabManagerDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. CONFIGURAÇÃO DE AUTENTICAÇÃO JWT
-// Esquema padrão ("Bearer") = JWT local, usado para simulação/testes
-// Esquema "Keycloak" = tokens reais do SSO institucional
-var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing");
-var keyBytes = Encoding.ASCII.GetBytes(jwtKey);
-
+// 4. AUTENTICAÇÃO DUPLA
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
+.AddJwtBearer(options => // LOCAL (Geração interna)
 {
-    // JWT local — simula tokens que virão do Keycloak durante o desenvolvimento
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
-        ValidateIssuer = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidateAudience = false,
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+        ValidateIssuer = false, ValidateAudience = false, ValidateLifetime = true, ClockSkew = TimeSpan.Zero
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var token = context.Request.Query["token"];
+            if (!string.IsNullOrEmpty(token) && context.Request.Path.StartsWithSegments("/api/v1/events"))
+                context.Token = token;
+            return Task.CompletedTask;
+        }
     };
 })
-.AddJwtBearer("Keycloak", options =>
+.AddJwtBearer("Keycloak", options => // EXTERNO (SSO)
 {
     options.Authority = builder.Configuration["Keycloak:Authority"] ?? "http://localhost:8080/realms/ucdb";
     options.MetadataAddress = builder.Configuration["Keycloak:MetadataAddress"] ?? "http://localhost:8080/realms/ucdb/.well-known/openid-configuration";
     options.RequireHttpsMetadata = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuerSigningKey = true,
-        ValidateIssuer = true,
+        ValidateIssuerSigningKey = true, ValidateIssuer = true,
         ValidIssuer = builder.Configuration["Keycloak:Authority"] ?? "http://localhost:8080/realms/ucdb",
-        
-        // ⬇️ MUDANÇA AQUI: Desligue a validação de audiência
-        ValidateAudience = false, 
-        
-        ValidateLifetime = true
+        ValidateAudience = false, ValidateLifetime = true
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var token = context.Request.Query["token"];
+            if (!string.IsNullOrEmpty(token) && context.Request.Path.StartsWithSegments("/api/v1/events"))
+                context.Token = token;
+            return Task.CompletedTask;
+        }
     };
 });
 
-// 3. CONFIGURAÇÃO DO SWAGGER COM SUPORTE A TOKEN JWT
-builder.Services.AddEndpointsApiExplorer();
+// 5. SWAGGER
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "LabManager API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "Insira o token JWT desta forma: Bearer {seu token}",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-    c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecuritySchemeReference("Bearer", doc),
-            new List<string>()
-        }
-    });
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo { Title = "LabManager Minimal API", Version = "v1" });
 });
 
 var app = builder.Build();
+
+// =========================================================================
+// PIPELINE DE EXECUÇÃO
+// =========================================================================
 
 if (app.Environment.IsDevelopment())
 {
@@ -110,20 +104,23 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+// =========================================================================
+// MAPEAMENTO DAS MINIMAL APIs
+// =========================================================================
 app.MapHealthChecks("/health");
+
+app.MapAuthEndpoints();
 app.MapLabsEndpoints();
 app.MapReservationsEndpoints();
+app.MapSseEndpoints();
 app.MapInventoryEndpoints();
 app.MapLogisticsEndpoints();
 app.MapUsersEndpoints();
 app.MapMaintenanceEndpoints();
 app.MapAdminEndpoints();
 app.MapAttendanceEndpoints();
-app.MapSseEndpoints();
 
 app.Run();

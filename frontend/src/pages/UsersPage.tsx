@@ -11,7 +11,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.PROFESSOR]:      "Professor",
   [UserRole.DTI_ESTAGIARIO]: "DTI Estagiário",
   [UserRole.DTI_TECNICO]:    "DTI Técnico",
-  [UserRole.PROGEX]:         "PROGEX", // Alterado
+  [UserRole.PROGEX]:         "PROGEX",
   [UserRole.ADMINISTRADOR]:  "Administrador",
   [UserRole.SUPER_ADMIN]:    "Super Administrador",
 };
@@ -27,8 +27,8 @@ const ROLE_COLORS: Record<UserRole, string> = {
 
 const PERMISSIONS: Record<UserRole, { can: string[]; cannot: string[] }> = {
   [UserRole.PROFESSOR]: {
-    can: ["Criar reservas", "Ver suas próprias reservas", "Consultar laboratórios", "Ver catálogo do almoxarifado"],
-    cannot: ["Aprovar/rejeitar reservas", "Gerenciar usuários", "Fazer checkout de materiais", "Abrir chamados de manutenção"],
+    can: ["Criar reservas", "Ver suas próprias reservas", "Consultar laboratórios"],
+    cannot: ["Aprovar/rejeitar reservas", "Gerenciar usuários", "Abrir chamados de manutenção", "Acesso padrão ao almoxarifado"],
   },
   [UserRole.DTI_ESTAGIARIO]: {
     can: ["Ver reservas pendentes", "Ver agenda do dia", "Visualizar usuários", "Abrir chamados de manutenção"],
@@ -53,7 +53,7 @@ const PERMISSIONS: Record<UserRole, { can: string[]; cannot: string[] }> = {
 };
 
 interface UserFormProps {
-  initial?: UserFull;
+  initial?: UserFull & { can_request_inventory?: boolean };
   onSave: (p: CreateUserPayload | UpdateUserPayload) => Promise<void>;
   onCancel: () => void;
   isEdit?: boolean;
@@ -66,10 +66,11 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
     full_name: initial?.full_name ?? "",
     role: initial?.role ?? UserRole.PROFESSOR,
     password: "",
+    can_request_inventory: initial?.can_request_inventory ?? false, // Inicializa a trava
   });
   const [saving, setSaving] = useState(false);
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +79,10 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
       const payload: any = {
         full_name: form.full_name,
         role: form.role,
+        // Garante que a flag só vá como true se realmente for professor e estiver marcada
+        can_request_inventory: form.role === UserRole.PROFESSOR ? form.can_request_inventory : false
       };
+      
       if (!isEdit) {
         payload.registration_number = form.registration_number;
         payload.password = form.password;
@@ -91,7 +95,6 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
     }
   };
 
-  // Filtrar quais funções o usuário logado pode atribuir
   const availableRoles = Object.values(UserRole).filter(r => {
     if (r === UserRole.SUPER_ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) return false;
     if (currentUser?.role === UserRole.PROGEX) {
@@ -115,6 +118,7 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
         <input required value={form.full_name} onChange={e => set("full_name", e.target.value)}
           className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-neutral-900 outline-none text-sm" />
       </div>
+      
       <div>
         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Papel / Permissões</label>
         <select value={form.role} onChange={e => set("role", e.target.value)}
@@ -123,6 +127,23 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
           ))}
         </select>
+        
+        {/* NOVA TRAVA CONDICIONAL PARA PROFESSORES */}
+        {form.role === UserRole.PROFESSOR && (
+          <div className="mt-3 p-3 border border-emerald-200 bg-emerald-50/50 rounded-xl flex items-center">
+            <input
+              type="checkbox"
+              id="canRequestInventory"
+              checked={form.can_request_inventory}
+              onChange={e => set("can_request_inventory", e.target.checked)}
+              className="w-5 h-5 text-emerald-600 rounded border-emerald-300 focus:ring-emerald-500 cursor-pointer"
+            />
+            <label htmlFor="canRequestInventory" className="ml-3 block text-sm font-bold text-emerald-800 cursor-pointer select-none">
+              Liberar acesso ao catálogo do Almoxarifado
+            </label>
+          </div>
+        )}
+
         <div className="mt-2 p-3 bg-neutral-50 rounded-xl text-xs space-y-1">
           <p className="font-bold text-neutral-600 mb-1">Permissões deste papel:</p>
           {PERMISSIONS[form.role as UserRole]?.can.map(p => (
@@ -133,6 +154,7 @@ function UserForm({ initial, onSave, onCancel, isEdit, currentUser }: UserFormPr
           ))}
         </div>
       </div>
+
       <div>
         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">
           {isEdit ? "Nova senha (deixe em branco para não alterar)" : "Senha"}
@@ -165,9 +187,7 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<UserFull | null>(null);
   const [showPermissions, setShowPermissions] = useState(false);
 
-  // PROGEX continua podendo "Gerenciar", mas o escopo é limitado internamente
   const canManage = me?.role === UserRole.PROGEX || me?.role === UserRole.DTI_TECNICO || me?.role === UserRole.ADMINISTRADOR || me?.role === UserRole.SUPER_ADMIN;
-  // Apenas Admins reais podem desativar usuários agora
   const canDeactivate = me?.role === UserRole.ADMINISTRADOR || me?.role === UserRole.SUPER_ADMIN;
 
   const handleCreate = async (payload: any) => {
@@ -272,7 +292,6 @@ export function UsersPage() {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {(data ?? []).map(u => {
-                // Checa se o usuário atual (PROGEX) tem permissão de editar este registro
                 const canEditUser = me?.role !== UserRole.PROGEX || u.role === UserRole.PROFESSOR || u.role === UserRole.PROGEX;
 
                 return (

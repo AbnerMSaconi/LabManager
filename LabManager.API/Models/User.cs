@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema; // <-- A IMPORTAÇÃO OBRIGATÓRIA
 
 namespace LabManager.API.Models;
 
@@ -18,6 +19,9 @@ public partial class User
     public bool IsActive { get; set; }
 
     public DateTime? DeletedAt { get; set; }
+
+    [Column("can_request_inventory")] // <-- O MAPEAMENTO CORRETO
+    public bool CanRequestInventory { get; set; } = false;
 
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 

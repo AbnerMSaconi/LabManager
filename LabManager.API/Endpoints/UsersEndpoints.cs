@@ -6,92 +6,79 @@ namespace LabManager.API.Endpoints;
 
 public static class UsersEndpoints
 {
+    // Esta lista espelha exatamente a variável 'canManage' do seu React
+    private static readonly string[] ManageRoles = ["dti_tecnico", "progex", "administrador", "super_admin"];
+
     public static void MapUsersEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/users").RequireAuthorization();
 
-        // GET /api/v1/users
+        // GET /api/v1/users (Removemos o 403 do Técnico)
         group.MapGet("/", async (ClaimsPrincipal user, LabManagerDbContext db) =>
         {
             var currentUser = await Shared.GetCurrentUserAsync(user, db);
             if (currentUser == null) return Results.Unauthorized();
-            if (!Shared.AdminRoles.Contains(currentUser.Role)) return Results.Forbid();
+            
+            // Trava alinhada com o React
+            if (!ManageRoles.Contains(currentUser.Role)) return Results.Forbid();
 
             var users = await db.Users
-                .Where(u => u.DeletedAt == null)
+                .Select(u => new { u.Id, u.RegistrationNumber, u.FullName, u.Role, u.IsActive, u.CanRequestInventory })
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
-            return Results.Ok(users.Select(MapUser));
+            return Results.Ok(users);
         });
 
         // POST /api/v1/users
-        group.MapPost("/", async (CreateUserRequest payload, ClaimsPrincipal user, LabManagerDbContext db) =>
+        group.MapPost("/", async (UserCreateRequest payload, ClaimsPrincipal user, LabManagerDbContext db) =>
         {
             var currentUser = await Shared.GetCurrentUserAsync(user, db);
             if (currentUser == null) return Results.Unauthorized();
-            if (!Shared.AdminRoles.Contains(currentUser.Role)) return Results.Forbid();
+            if (!ManageRoles.Contains(currentUser.Role)) return Results.Forbid();
 
-            var exists = await db.Users.AnyAsync(u => u.RegistrationNumber == payload.RegistrationNumber);
-            if (exists)
-                return Results.Conflict(new { detail = "Usuário com este número de registro já existe." });
+            if (await db.Users.AnyAsync(u => u.RegistrationNumber == payload.RegistrationNumber))
+                return Results.BadRequest(new { detail = "Matrícula/Usuário já cadastrado no sistema." });
 
             var newUser = new User
             {
                 RegistrationNumber = payload.RegistrationNumber,
                 FullName = payload.FullName,
-                HashedPassword = BCrypt.Net.BCrypt.HashPassword(payload.Password),
                 Role = payload.Role,
-                IsActive = true
+                IsActive = true,
+                CanRequestInventory = payload.CanRequestInventory ?? false,
+                HashedPassword = "SSO_EXTERNAL"
             };
+
             db.Users.Add(newUser);
             await db.SaveChangesAsync();
-            return Results.Json(new { id = newUser.Id, message = "Usuário criado." }, statusCode: 201);
+            return Results.Json(new { message = "Usuário cadastrado com sucesso.", id = newUser.Id }, statusCode: 201);
         });
 
-        // PATCH /api/v1/users/{id}
-        group.MapPatch("/{id:int}", async (int id, UpdateUserRequest payload, ClaimsPrincipal user, LabManagerDbContext db) =>
+        // LÓGICA DE ATUALIZAÇÃO ISOLADA
+        var updateHandler = async (int id, UserUpdateRequest payload, ClaimsPrincipal user, LabManagerDbContext db) =>
         {
             var currentUser = await Shared.GetCurrentUserAsync(user, db);
             if (currentUser == null) return Results.Unauthorized();
-            if (!Shared.AdminRoles.Contains(currentUser.Role)) return Results.Forbid();
+            if (!ManageRoles.Contains(currentUser.Role)) return Results.Forbid();
 
-            var target = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.DeletedAt == null);
-            if (target == null) return Results.NotFound(new { detail = "Usuário não encontrado." });
+            var targetUser = await db.Users.FindAsync(id);
+            if (targetUser == null) return Results.NotFound(new { detail = "Usuário não encontrado." });
 
-            if (payload.FullName != null) target.FullName = payload.FullName;
-            if (payload.Role != null) target.Role = payload.Role;
-            if (payload.IsActive.HasValue) target.IsActive = payload.IsActive.Value;
-            if (!string.IsNullOrEmpty(payload.Password))
-                target.HashedPassword = BCrypt.Net.BCrypt.HashPassword(payload.Password);
+            if (!string.IsNullOrEmpty(payload.FullName)) targetUser.FullName = payload.FullName;
+            if (!string.IsNullOrEmpty(payload.Role)) targetUser.Role = payload.Role;
+            if (payload.IsActive.HasValue) targetUser.IsActive = payload.IsActive.Value;
+            if (payload.CanRequestInventory.HasValue) targetUser.CanRequestInventory = payload.CanRequestInventory.Value;
 
             await db.SaveChangesAsync();
             return Results.Ok(new { message = "Usuário atualizado." });
-        });
+        };
+
+        // MATANDO O ERRO 405: Aceitamos os dois verbos HTTP!
+        group.MapPut("/{id:int}", updateHandler);
+        group.MapPatch("/{id:int}", updateHandler); 
     }
 
-    private static object MapUser(User u) => new
-    {
-        u.Id,
-        RegistrationNumber = u.RegistrationNumber,
-        u.FullName,
-        u.Role,
-        u.IsActive
-    };
-
-    public class CreateUserRequest
-    {
-        public string RegistrationNumber { get; set; } = null!;
-        public string FullName { get; set; } = null!;
-        public string Password { get; set; } = null!;
-        public string Role { get; set; } = null!;
-    }
-
-    public class UpdateUserRequest
-    {
-        public string? FullName { get; set; }
-        public string? Role { get; set; }
-        public bool? IsActive { get; set; }
-        public string? Password { get; set; }
-    }
+    public class UserCreateRequest { public string RegistrationNumber { get; set; } = null!; public string FullName { get; set; } = null!; public string Role { get; set; } = null!; public bool? CanRequestInventory { get; set; } }
+    public class UserUpdateRequest { public string? FullName { get; set; } public string? Role { get; set; } public bool? IsActive { get; set; } public bool? CanRequestInventory { get; set; } }
 }

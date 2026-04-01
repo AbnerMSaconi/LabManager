@@ -13,9 +13,21 @@ internal static class Shared
 
     internal static async Task<User?> GetCurrentUserAsync(ClaimsPrincipal user, LabManagerDbContext db)
     {
-        var userId = user.FindFirst("sub")?.Value;
-        if (userId == null || !int.TryParse(userId, out var id)) return null;
-        return await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.IsActive);
+        // 1. Tenta ler o ID numérico (Se o React enviar o Token Local)
+        var subClaim = user.FindFirst("sub")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrEmpty(subClaim) && int.TryParse(subClaim, out var id))
+        {
+            return await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.IsActive);
+        }
+
+        // 2. Tenta ler o username (Se o React enviar o Token do Keycloak)
+        var username = user.FindFirst("preferred_username")?.Value;
+        if (!string.IsNullOrEmpty(username))
+        {
+            return await db.Users.FirstOrDefaultAsync(u => u.RegistrationNumber == username && u.IsActive);
+        }
+
+        return null; // Acesso negado apenas se nenhum token for válido
     }
 
     internal static object MapReservation(Reservation r) => new

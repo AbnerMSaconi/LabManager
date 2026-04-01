@@ -185,7 +185,9 @@ public static class ReservationsEndpoints
                 await db.SaveChangesAsync();
 
                 if (payload.Items?.Count > 0)
-                {
+                {   
+                    if (currentUser.Role == "professor" && !currentUser.CanRequestInventory)
+                    return Results.Json(new { detail = "Você não possui autorização para solicitar itens do almoxarifado." }, statusCode: 403);
                     foreach (var item in payload.Items)
                         db.ReservationItems.Add(new ReservationItem
                         {

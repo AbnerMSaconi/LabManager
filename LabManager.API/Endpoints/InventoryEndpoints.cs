@@ -13,8 +13,15 @@ public static class InventoryEndpoints
         var group = app.MapGroup("/api/v1/inventory").RequireAuthorization();
 
         // GET /api/v1/inventory/models
-        group.MapGet("/models", async (LabManagerDbContext db) =>
+        group.MapGet("/models", async (ClaimsPrincipal user, LabManagerDbContext db) =>
         {
+            var currentUser = await Shared.GetCurrentUserAsync(user, db);
+            if (currentUser == null) return Results.Unauthorized();
+            
+            // A TRAVA MESTRA: É professor e não tem a flag? Bloqueado!
+            if (currentUser.Role == "professor" && !currentUser.CanRequestInventory) 
+                return Results.Forbid();
+
             var models = await db.ItemModels
                 .Where(m => m.DeletedAt == null)
                 .OrderBy(m => m.Name)
@@ -24,8 +31,15 @@ public static class InventoryEndpoints
         });
 
         // GET /api/v1/inventory/models/available?date=
-        group.MapGet("/models/available", async (string? date, LabManagerDbContext db) =>
+        group.MapGet("/models/available", async (string? date, ClaimsPrincipal user, LabManagerDbContext db) =>
         {
+            var currentUser = await Shared.GetCurrentUserAsync(user, db);
+            if (currentUser == null) return Results.Unauthorized();
+            
+            // A TRAVA MESTRA TAMBÉM AQUI
+            if (currentUser.Role == "professor" && !currentUser.CanRequestInventory) 
+                return Results.Forbid();
+
             if (string.IsNullOrEmpty(date) || !DateOnly.TryParse(date, out var parsedDate))
                 return Results.BadRequest(new { detail = "Parâmetro 'date' inválido ou ausente." });
 

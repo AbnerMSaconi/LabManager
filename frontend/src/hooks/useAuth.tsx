@@ -102,12 +102,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [oidc]);
 
-  const logout = useCallback(() => {
+const logout = useCallback(async () => {
+    // 1. Limpa o token do C# da memória local
     localStorage.removeItem("access_token");
     setUser(null);
-    oidc.removeUser();
+    
+    // 2. Avisa o servidor do Keycloak para destruir a sessão global
+    try {
+      await oidc.signoutRedirect({
+        post_logout_redirect_uri: window.location.origin
+      });
+    } catch (err) {
+      console.error("[useAuth] Erro ao redirecionar para logout no Keycloak:", err);
+      // Fallback de segurança caso o servidor esteja fora do ar
+      oidc.removeUser(); 
+    }
   }, [oidc]);
-
   // loading = OIDC inicializando OU sync C# em andamento
   const loading = oidc.isLoading || syncLoading;
 

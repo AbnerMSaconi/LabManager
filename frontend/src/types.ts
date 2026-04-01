@@ -43,7 +43,9 @@ export interface User {
   id: number;
   registration_number: string;
   full_name: string;
-  role: UserRole;
+  role: string;
+  is_active: boolean;
+  can_request_inventory?: boolean; // <-- Novo campo mapeado do backend
 }
 
 export interface Laboratory {

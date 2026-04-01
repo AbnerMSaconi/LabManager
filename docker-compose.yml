@@ -1,5 +1,4 @@
 services:
-# ── Provedor de Identidade (Simulação do SSO da Instituição) ───────────────
   # ── Provedor de Identidade (Simulação do SSO da Instituição) ───────────────
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -60,36 +59,7 @@ services:
     networks:
       - labmanager_net
 
-  # ── Backend FastAPI + Gunicorn ─────────────────────────────────────────────
-  backend:
-    build:
-      context: ./backend-python
-      dockerfile: Dockerfile
-    restart: always
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL:                  mssql+pyodbc://SA:${MSSQL_SA_PASSWORD:-LabManager_2024!}@db:1433/labmanager?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
-      SECRET_KEY:                    ${SECRET_KEY:-LabManager-Dev-Secret-Key-2024!!}
-      ALGORITHM:                     HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES:   ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
-      CORS_ORIGINS: "*"
-    volumes:
-      - ./backend-python:/app
-      - backup_data:/app/backups
-    depends_on:
-      db-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health/ || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    networks:
-      - labmanager_net
-
-  # ── Backend ASP.NET Core (C#) ─────────────────────────────────────────────
+  # ── Backend ASP.NET Core (C# Minimal APIs) ────────────────────────────────
   backend-csharp:
     build:
       context: ./LabManager.API
