@@ -16,7 +16,7 @@ interface SyncResponse {
 export async function syncWithBackend(accessToken: string): Promise<User> {
   const res = await fetch("/api/v1/auth/sync", {
     method: "POST",
-    headers: { "Authorization": `Keycloak ${accessToken}` },
+    headers: { "Authorization": `Bearer ${accessToken}` },
     cache: "no-store",
   });
 

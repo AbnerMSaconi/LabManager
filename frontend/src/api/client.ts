@@ -35,7 +35,7 @@ async function request<T>(
 
   if (authenticated) {
     const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (token) headers["Authorization"] = `Keycloak ${token}`;
   }
 
   const res = await fetch(`${API_BASE}${path}`, { 

@@ -8,7 +8,7 @@ using LabManager.API.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-
+builder.Services.AddHealthChecks();
 // 1. INJEÇÃO DO BANCO DE DADOS
 builder.Services.AddDbContext<LabManagerDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -35,7 +35,7 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
         ValidateIssuer = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidateAudience = true,
+        ValidateAudience = false,
         ValidAudience = builder.Configuration["Jwt:Audience"],
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
@@ -43,20 +43,18 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer("Keycloak", options =>
 {
-    // Keycloak — valida tokens reais via OIDC discovery (chave pública RSA automática)
-    // Authority define o issuer esperado nos tokens; MetadataAddress usa URL interna Docker para buscar JWKS
-    options.Authority = builder.Configuration["Keycloak:Authority"]
-        ?? "http://localhost:8080/realms/ucdb";
-    options.MetadataAddress = builder.Configuration["Keycloak:MetadataAddress"]
-        ?? "http://localhost:8080/realms/ucdb/.well-known/openid-configuration";
+    options.Authority = builder.Configuration["Keycloak:Authority"] ?? "http://localhost:8080/realms/ucdb";
+    options.MetadataAddress = builder.Configuration["Keycloak:MetadataAddress"] ?? "http://localhost:8080/realms/ucdb/.well-known/openid-configuration";
     options.RequireHttpsMetadata = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
         ValidateIssuer = true,
         ValidIssuer = builder.Configuration["Keycloak:Authority"] ?? "http://localhost:8080/realms/ucdb",
-        ValidateAudience = true,
-        ValidAudience = builder.Configuration["Keycloak:Audience"] ?? "account",
+        
+        // ⬇️ MUDANÇA AQUI: Desligue a validação de audiência
+        ValidateAudience = false, 
+        
         ValidateLifetime = true
     };
 });
@@ -98,5 +96,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();

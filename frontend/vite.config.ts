@@ -13,12 +13,20 @@ export default defineConfig(({ mode }) => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
-        // Rota específica para o backend C# (sync/auth via Keycloak)
+        // 1. Proxy reverso para o Keycloak (Engana o navegador e resolve o CORS)
+        '/keycloak': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/keycloak/, '')
+        },
+        
+        // 2. Rota de Auth apontando para o C# no Docker (Porta 8001 corrigida)
         '/api/v1/auth/sync': {
-          target: 'http://localhost:5165',
+          target: 'http://localhost:8001', 
           changeOrigin: true,
         },
-        // Demais rotas /api/* para o FastAPI em :8000
+        
+        // 3. Demais rotas /api/* para o FastAPI em :8000
         '/api': {
           target: env.VITE_API_BASE_URL ?? 'http://localhost:8000',
           changeOrigin: true,
