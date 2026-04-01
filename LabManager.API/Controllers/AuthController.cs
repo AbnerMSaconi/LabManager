@@ -88,11 +88,12 @@ namespace LabManager.API.Controllers
         private string GeneratePythonCompatibleToken(int userId)
         {
             var secret = _config["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key não configurado");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+            var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secret));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var expireMinutes = int.TryParse(_config["Jwt:ExpireMinutes"], out var m) ? m : 480;
 
             var token = new JwtSecurityToken(
+                issuer: _config["Jwt:Issuer"],
                 claims: [new Claim("sub", userId.ToString())],
                 expires: DateTime.UtcNow.AddMinutes(expireMinutes),
                 signingCredentials: creds

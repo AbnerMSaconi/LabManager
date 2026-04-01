@@ -80,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSyncLoading(false);
         setError("Não foi possível sincronizar com o servidor. Verifique se o serviço está disponível.");
         localStorage.removeItem("access_token");
+        oidc.removeUser(); // encerra sessão OIDC para evitar loop de retry
       });
 
   }, [oidc.isAuthenticated, oidc.user?.access_token]);

@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
         
         // 3. Demais rotas /api/* para o FastAPI em :8000
         '/api': {
-          target: env.VITE_API_BASE_URL ?? 'http://localhost:8000',
+          target: env.VITE_API_BASE_URL ?? 'http://localhost:8001',
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('proxyRes', (proxyRes) => {

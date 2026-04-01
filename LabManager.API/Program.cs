@@ -1,14 +1,34 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using LabManager.API.Models;
+using LabManager.API.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
+builder.Services.AddAuthorization();
+
+// Snake_case para todas as respostas JSON (Minimal APIs e Controllers)
+builder.Services.ConfigureHttpJsonOptions(o =>
+    o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o =>
+    o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
+
+// CORS — permite qualquer origem em desenvolvimento
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 // 1. INJEÇÃO DO BANCO DE DADOS
 builder.Services.AddDbContext<LabManagerDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -89,13 +109,21 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+app.UseCors();
 
-// IMPORTANTE: Authentication deve vir ANTES de Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapLabsEndpoints();
+app.MapReservationsEndpoints();
+app.MapInventoryEndpoints();
+app.MapLogisticsEndpoints();
+app.MapUsersEndpoints();
+app.MapMaintenanceEndpoints();
+app.MapAdminEndpoints();
+app.MapAttendanceEndpoints();
+app.MapSseEndpoints();
 
 app.Run();
